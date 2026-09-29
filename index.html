@@ -351,7 +351,9 @@ input[type="range"]{flex:1;min-width:0;height:30px;accent-color:var(--op-mul);cu
   min-width:2.2ch;border-bottom:8px solid var(--op);border-radius:3px;padding:0 .06em;
   color:var(--op);
 }
-.slot.empty{color:var(--line-strong)}
+/* "blank", not "empty": .empty is the small grey message style, and sharing it
+   shrank the slot to a dash-sized stub that read as a minus sign */
+.slot.blank{color:var(--line-strong)}
 .stage.miss .slot{color:var(--bad);border-bottom-color:var(--bad)}
 .stage.hit .slot{color:var(--good);border-bottom-color:var(--good)}
 .caret{display:inline-block;width:.07em;height:.85em;background:currentColor;vertical-align:-.06em;
@@ -1752,13 +1754,15 @@ function nextProblem(){
   $("opTag").style.background = o.color;
   $("stage").classList.remove("hit","miss");
   $("verdict").textContent = ""; $("verdict").className = "verdict";
-  drawEquation();
   if(run.mode === "survival"){
     run.pLimit = problemLimit();
     run.pEndAt = performance.now() + run.pLimit;
   }
   run.t0 = performance.now();
+  /* Unlock before drawing: the caret is only drawn for an open problem, and a
+     voice player may never type to trigger a redraw. */
   run.locked = false;
+  drawEquation();
 }
 
 function drawEquation(){
@@ -1768,7 +1772,7 @@ function drawEquation(){
     '<span class="o">'+OPS[p.op].sym+'</span>'+
     '<span>'+p.right+'</span>'+
     '<span class="eq">=</span>'+
-    '<span class="slot'+(typed?"":" empty")+'">'+(typed || " ")+
+    '<span class="slot'+(typed?"":" blank")+'">'+(typed || " ")+
       (run.locked ? "" : '<span class="caret"></span>')+'</span>';
 }
 

@@ -9,6 +9,17 @@
 <link rel="icon" href="icons/icon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <title>Number Zoomies</title>
+<script>
+/* Pick the theme before first paint so dark mode never flashes white.
+   A saved choice wins; otherwise follow the device. */
+(function(){
+  var t = null;
+  try{ t = localStorage.getItem("nz.theme"); }catch(e){}
+  var dark = t ? t === "dark"
+               : !!(window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches);
+  document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
@@ -34,6 +45,25 @@
   --bad-soft:#FCE7E7;
   --gold:#F2B705;
 
+  /* filled buttons, and the tints that sit behind coloured text */
+  --solid:#1A2430;
+  --on-solid:#FFFFFF;
+  --solid-shadow:#0b1119;
+  --hover:#EEEBE1;
+  --untried:#F0EDE4;
+  --warm:#FFF8E3;
+  --warm-ink:#7A5A00;
+  --notice:#FFF4D6;
+  --notice-ink:#5A4300;
+  --notice-code:#F7E6B8;
+  --teal-soft:#E3F5F4;
+  --teal-ink:#065C5B;
+  --bad-ink:#8E1F22;
+  --tier1:#EFD79B;
+  --hero-bg:#1A2430;
+  --scrim:rgba(26,36,48,.55);
+  color-scheme:light;
+
   --r-sm:8px; --r-md:14px; --r-lg:22px;
   --shadow:0 2px 0 var(--line-strong);
   --shadow-lift:0 6px 0 var(--line-strong);
@@ -41,6 +71,38 @@
   --f-display:"Fredoka","Trebuchet MS",system-ui,sans-serif;
   --f-body:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",monospace;
+}
+/* Dark: a blackboard instead of paper. The rod colours stay put — they're the
+   same colours in both, bright enough to read on either. */
+:root[data-theme="dark"]{
+  --paper:#12171E;
+  --card:#1B222C;
+  --grid:rgba(255,255,255,.035);
+  --ink:#E7EAEE;
+  --muted:#9AA3AF;
+  --line:#2C3542;
+  --line-strong:#3D4857;
+
+  --good-soft:#15301B;
+  --bad-soft:#3A1A1D;
+
+  --solid:#E7EAEE;
+  --on-solid:#12171E;
+  --solid-shadow:#7F8997;
+  --hover:#232B36;
+  --untried:#232B36;
+  --warm:#382E0E;
+  --warm-ink:#F5D36B;
+  --notice:#2D2710;
+  --notice-ink:#F2DC9A;
+  --notice-code:#463B14;
+  --teal-soft:#10312F;
+  --teal-ink:#7FDCD9;
+  --bad-ink:#FFB4B6;
+  --tier1:#6B5A22;
+  --hero-bg:#242E3B;
+  --scrim:rgba(0,0,0,.62);
+  color-scheme:dark;
 }
 
 *{box-sizing:border-box}
@@ -103,7 +165,7 @@ h1,h2,h3{margin:0;font-family:var(--f-display);font-weight:600;text-wrap:balance
   font-weight:600;
 }
 .player-chip .go{
-  border:0;background:var(--ink);color:#fff;border-radius:999px;
+  border:0;background:var(--solid);color:var(--on-solid);border-radius:999px;
   width:30px;height:30px;font-size:.9rem;line-height:1;
 }
 .player-chip .del{border:0;background:none;color:var(--muted);font-size:1rem;padding:0 4px}
@@ -166,7 +228,7 @@ input[type="range"]{flex:1;min-width:0;height:30px;accent-color:var(--op-mul);cu
 .more summary::-webkit-details-marker{display:none}
 .more summary::before{content:"+";font-size:1.2rem;color:var(--muted);width:1ch;line-height:1}
 .more[open] summary::before{content:"\2212"}
-.more summary:hover{background:#EEEBE1}
+.more summary:hover{background:var(--hover)}
 .more .inner{padding:4px 16px 18px}
 .more .field:last-child{margin-bottom:0}
 
@@ -181,12 +243,12 @@ input[type="range"]{flex:1;min-width:0;height:30px;accent-color:var(--op-mul);cu
 .toggle em{display:block;font-style:normal;color:var(--muted);font-size:.82rem;line-height:1.4;margin-top:1px}
 
 .start{
-  width:100%;margin-top:6px;border:0;border-radius:var(--r-lg);background:var(--ink);color:#fff;
+  width:100%;margin-top:6px;border:0;border-radius:var(--r-lg);background:var(--solid);color:var(--on-solid);
   font-family:var(--f-display);font-size:1.5rem;font-weight:700;padding:18px;
-  box-shadow:0 5px 0 #0b1119;
+  box-shadow:0 5px 0 var(--solid-shadow);
 }
-.start:active{transform:translateY(3px);box-shadow:0 2px 0 #0b1119}
-.start:disabled{background:var(--line-strong);box-shadow:none;cursor:not-allowed}
+.start:active{transform:translateY(3px);box-shadow:0 2px 0 var(--solid-shadow)}
+.start:disabled{background:var(--line-strong);color:var(--muted);box-shadow:none;cursor:not-allowed}
 
 /* ---------- play ---------- */
 .hud{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
@@ -220,7 +282,7 @@ input[type="range"]{flex:1;min-width:0;height:30px;accent-color:var(--op-mul);cu
 .stage.miss::before{background:var(--bad-soft);opacity:1}
 .stage > *{position:relative}
 .stage{transition:border-color .35s,box-shadow .35s}
-.stage[data-tier="1"]{border-color:#EFD79B}
+.stage[data-tier="1"]{border-color:var(--tier1)}
 .stage[data-tier="2"]{border-color:var(--gold);
   box-shadow:var(--shadow-lift),0 0 0 4px rgba(242,183,5,.15)}
 .stage[data-tier="3"]{border-color:var(--op-mul);
@@ -269,7 +331,7 @@ input[type="range"]{flex:1;min-width:0;height:30px;accent-color:var(--op-mul);cu
   border-radius:var(--r-md);overflow:hidden;background:var(--paper);margin-top:12px;
   display:grid;place-items:center}
 .fxpreview span{font-size:.82rem;color:var(--muted);font-weight:600}
-.hud .stat.hot{border-color:var(--gold);background:#FFF8E3;color:#7A5A00}
+.hud .stat.hot{border-color:var(--gold);background:var(--warm);color:var(--warm-ink)}
 .hud .stat.bump{animation:bump .34s ease-out}
 @keyframes bump{40%{transform:scale(1.16)}}
 
@@ -296,18 +358,18 @@ input[type="range"]{flex:1;min-width:0;height:30px;accent-color:var(--op-mul);cu
   animation:blink 1.05s steps(1) infinite}
 @keyframes blink{50%{opacity:0}}
 .hud .mic{display:flex;align-items:center;gap:7px;cursor:pointer;border-color:var(--line-strong)}
-.hud .mic[aria-pressed="true"]{border-color:var(--op-div);background:#E3F5F4;color:#065C5B}
+.hud .mic[aria-pressed="true"]{border-color:var(--op-div);background:var(--teal-soft);color:var(--teal-ink)}
 .dotmic{width:9px;height:9px;border-radius:50%;background:var(--line-strong);flex:none}
 .hud .mic[aria-pressed="true"] .dotmic{background:var(--op-div);animation:pulse 1.4s ease-in-out infinite}
-.hud .mic.err{border-color:var(--bad);background:var(--bad-soft);color:#8E1F22}
+.hud .mic.err{border-color:var(--bad);background:var(--bad-soft);color:var(--bad-ink)}
 .hud .mic.err .dotmic{background:var(--bad);animation:none}
-.hud .mic.warn{border-color:var(--gold);background:#FFF8E3;color:#7A5A00}
+.hud .mic.warn{border-color:var(--gold);background:var(--warm);color:var(--warm-ink)}
 .hud .mic.warn .dotmic{background:var(--gold);animation:none}
 @keyframes pulse{50%{opacity:.25}}
-.notice{background:#FFF4D6;border:2px solid var(--gold);border-radius:var(--r-md);
-  padding:11px 14px;font-size:.85rem;line-height:1.55;margin-bottom:12px;color:#5A4300}
+.notice{background:var(--notice);border:2px solid var(--gold);border-radius:var(--r-md);
+  padding:11px 14px;font-size:.85rem;line-height:1.55;margin-bottom:12px;color:var(--notice-ink)}
 .notice b{font-weight:700}
-.notice code{font-family:var(--f-mono);font-size:.95em;background:#F7E6B8;
+.notice code{font-family:var(--f-mono);font-size:.95em;background:var(--notice-code);
   padding:1px 5px;border-radius:4px}
 .heard{min-height:20px;font-family:var(--f-mono);font-size:.78rem;color:var(--muted);
   font-weight:500;margin-top:2px}
@@ -326,14 +388,14 @@ input[type="range"]{flex:1;min-width:0;height:30px;accent-color:var(--op-mul);cu
   font-variant-numeric:tabular-nums;
 }
 .keypad button:active{transform:translateY(2px);box-shadow:none}
-.keypad .enter{grid-column:span 2;background:var(--ink);color:#fff;border-color:var(--ink);font-size:1.05rem;
-  box-shadow:0 2px 0 #0b1119}
+.keypad .enter{grid-column:span 2;background:var(--solid);color:var(--on-solid);border-color:var(--solid);font-size:1.05rem;
+  box-shadow:0 2px 0 var(--solid-shadow)}
 .keypad .back{font-size:1.2rem}
 
 .playfoot{display:flex;justify-content:center;gap:10px;margin-top:16px}
 
 .pause{
-  position:fixed;inset:0;background:rgba(26,36,48,.55);display:grid;place-items:center;z-index:40;padding:16px;
+  position:fixed;inset:0;background:var(--scrim);display:grid;place-items:center;z-index:40;padding:16px;
 }
 .pause .box{background:var(--card);border-radius:var(--r-lg);padding:26px;text-align:center;max-width:340px;
   border:2px solid var(--line);box-shadow:var(--shadow-lift)}
@@ -341,7 +403,7 @@ input[type="range"]{flex:1;min-width:0;height:30px;accent-color:var(--op-mul);cu
 
 /* ---------- results ---------- */
 .hero{
-  background:var(--ink);color:#fff;border-radius:var(--r-lg);padding:26px 22px;text-align:center;
+  background:var(--hero-bg);color:#fff;border-radius:var(--r-lg);padding:26px 22px;text-align:center;
   box-shadow:0 5px 0 #0b1119;
 }
 .hero .rank{font-family:var(--f-mono);font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;
@@ -380,7 +442,7 @@ td .opname i{width:10px;height:18px;border-radius:3px;display:block}
 .tabs{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
 .tab{border:2px solid var(--line-strong);background:var(--card);border-radius:999px;padding:6px 14px;
   font-weight:600;font-size:.85rem}
-.tab[aria-selected="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.tab[aria-selected="true"]{background:var(--solid);color:var(--on-solid);border-color:var(--solid)}
 
 .heat{display:grid;gap:3px;width:max-content;font-variant-numeric:tabular-nums}
 .heat .hc{width:26px;height:26px;border-radius:4px;display:grid;place-items:center;font-size:.62rem;
@@ -410,11 +472,11 @@ td .opname i{width:10px;height:18px;border-radius:3px;display:block}
 .actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:20px}
 .btn{
   border:0;border-radius:var(--r-md);padding:14px 22px;font-family:var(--f-display);font-weight:600;
-  font-size:1.05rem;background:var(--ink);color:#fff;box-shadow:0 4px 0 #0b1119;flex:1 1 180px;
+  font-size:1.05rem;background:var(--solid);color:var(--on-solid);box-shadow:0 4px 0 var(--solid-shadow);flex:1 1 180px;
 }
-.btn:active{transform:translateY(2px);box-shadow:0 2px 0 #0b1119}
+.btn:active{transform:translateY(2px);box-shadow:0 2px 0 var(--solid-shadow)}
 .btn.alt{background:var(--card);color:var(--ink);border:2px solid var(--line-strong);box-shadow:var(--shadow)}
-.btn.drill{background:var(--op-mul);box-shadow:0 4px 0 #A9531A}
+.btn.drill{background:var(--op-mul);color:#fff;box-shadow:0 4px 0 #A9531A}
 
 .empty{color:var(--muted);font-size:.9rem;line-height:1.5}
 .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
@@ -451,6 +513,7 @@ td .opname i{width:10px;height:18px;border-radius:3px;display:block}
   <header class="topbar">
     <div class="brand"><span class="rods"><i></i><i></i><i></i><i></i></span> Number Zoomies</div>
     <div class="spacer"></div>
+    <button class="ghost" id="btnTheme" aria-pressed="false">Dark off</button>
     <button class="ghost" id="btnSound" aria-pressed="true">Sound on</button>
     <button class="ghost" id="btnSwitch" hidden>Switch player</button>
   </header>
@@ -683,8 +746,8 @@ td .opname i{width:10px;height:18px;border-radius:3px;display:block}
         <span><i style="background:#9BC53D"></i> 1.5–3s</span>
         <span><i style="background:#F2B705"></i> 3–6s</span>
         <span><i style="background:#EC7A28"></i> over 6s</span>
-        <span><i style="background:#DDD9CE"></i> not tried yet</span>
-        <span><i style="box-shadow:inset 0 0 0 2px #E5484D;background:#fff"></i> missed before</span>
+        <span><i style="background:var(--line)"></i> not tried yet</span>
+        <span><i style="box-shadow:inset 0 0 0 2px #E5484D;background:var(--card)"></i> missed before</span>
       </div>
       <p class="heat-note" id="rHeatNote"></p>
     </div>
@@ -702,7 +765,7 @@ td .opname i{width:10px;height:18px;border-radius:3px;display:block}
         <span><i style="background:#F2B705"></i> slow</span>
         <span><i style="background:#EC7A28"></i> shaky</span>
         <span><i style="background:#E5484D"></i> missing a lot</span>
-        <span><i style="background:#DDD9CE"></i> under 4 tries</span>
+        <span><i style="background:var(--line)"></i> under 4 tries</span>
       </div>
       <div class="actions" id="rFamDrill"></div>
     </div>
@@ -2037,24 +2100,24 @@ function traceSVG(A, med){
   [0, 0.5, 1].forEach(function(t){
     const y = padT + ih - t*ih;
     grid += '<line x1="'+padL+'" y1="'+y.toFixed(1)+'" x2="'+(W-padR)+'" y2="'+y.toFixed(1)+
-            '" stroke="#DDD9CE" stroke-width="1"/>'+
+            '" style="stroke:var(--line)" stroke-width="1"/>'+
             '<text x="'+(padL-8)+'" y="'+(y+4).toFixed(1)+'" text-anchor="end" font-size="11" '+
-            'font-family="IBM Plex Mono, monospace" fill="#6E7480">'+(maxMs*t/1000).toFixed(1)+'s</text>';
+            'font-family="IBM Plex Mono, monospace" style="fill:var(--muted)">'+(maxMs*t/1000).toFixed(1)+'s</text>';
   });
   let medLine = "";
   if(med){
     const y = padT + ih - Math.min(med,maxMs)/maxMs*ih;
     medLine = '<line x1="'+padL+'" y1="'+y.toFixed(1)+'" x2="'+(W-padR)+'" y2="'+y.toFixed(1)+
-      '" stroke="#1A2430" stroke-width="1.5" stroke-dasharray="5 4"/>'+
+      '" style="stroke:var(--ink)" stroke-width="1.5" stroke-dasharray="5 4"/>'+
       '<text x="'+(W-padR)+'" y="'+(y-6).toFixed(1)+'" text-anchor="end" font-size="11" '+
-      'font-family="IBM Plex Mono, monospace" fill="#1A2430">median '+secs(med)+'s</text>';
+      'font-family="IBM Plex Mono, monospace" style="fill:var(--ink)">median '+secs(med)+'s</text>';
   }
   return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block" '+
     'role="img" aria-label="Time taken for each answer in order">'+grid+bars+medLine+
     '<text x="'+padL+'" y="'+(H-6)+'" font-size="11" font-family="IBM Plex Mono, monospace" '+
-    'fill="#6E7480">problem 1</text>'+
+    'style="fill:var(--muted)">problem 1</text>'+
     '<text x="'+(W-padR)+'" y="'+(H-6)+'" text-anchor="end" font-size="11" '+
-    'font-family="IBM Plex Mono, monospace" fill="#6E7480">problem '+A.length+'</text></svg>';
+    'font-family="IBM Plex Mono, monospace" style="fill:var(--muted)">problem '+A.length+'</text></svg>';
 }
 
 function renderTable(A){
@@ -2077,8 +2140,8 @@ function renderTable(A){
 }
 
 function heatColor(med, n){
-  if(!n) return "#DDD9CE";
-  if(!med) return "#F0EDE4";
+  if(!n) return "var(--line)";
+  if(!med) return "var(--untried)";
   if(med < 1500) return "#3FA34D";
   if(med < 3000) return "#9BC53D";
   if(med < 6000) return "#F2B705";
@@ -2125,7 +2188,7 @@ function renderHeat(){
       c.title = lbl + (s ? "  ·  "+s.ok+"/"+s.n+" correct"+
                            (med ? ", typically "+secs(med)+"s"+(spoken?" (spoken)":"") : "")
                          : "  ·  not tried yet");
-      if(heatOp === "div" && b === 0){ c.style.background = "#F0EDE4"; c.title = "Nothing is divided by zero"; }
+      if(heatOp === "div" && b === 0){ c.style.background = "var(--untried)"; c.title = "Nothing is divided by zero"; }
       g.appendChild(c);
     }
   }
@@ -2135,10 +2198,10 @@ function renderHeat(){
 
 function famColor(e){
   const s = familyScore(e);
-  if(!s) return "#DDD9CE";
+  if(!s) return "var(--line)";
   if(s.acc < 0.70) return "#E5484D";
   if(s.acc < 0.90) return "#EC7A28";
-  if(!s.med) return "#DDD9CE";
+  if(!s.med) return "var(--line)";
   if(s.med >= DEVELOPING_MS) return "#EC7A28";
   if(s.med >= FLUENT_MS) return "#F2B705";
   if(s.med >= 1500) return "#9BC53D";
@@ -2174,6 +2237,7 @@ function renderFamilies(){
       const c = document.createElement("div");
       c.className = "fc";
       c.style.background = famColor(e);
+      if(c.style.background.indexOf("--line") >= 0) c.style.color = "var(--muted)";
       const s = familyScore(e);
       c.textContent = s ? Math.round(s.acc*100) : "";
       c.title = "The " + e.fam + "s in " + OPS[op].name.toLowerCase() + " — " +
@@ -2260,8 +2324,8 @@ function renderHistory(){
   [0,0.5,1].forEach(function(t){
     const yy = padT+ih-t*ih;
     grid += '<line x1="'+padL+'" y1="'+yy+'" x2="'+(W-padR)+'" y2="'+yy+
-      '" stroke="#DDD9CE" stroke-width="1"/><text x="'+(padL-8)+'" y="'+(yy+4)+
-      '" text-anchor="end" font-size="11" font-family="IBM Plex Mono, monospace" fill="#6E7480">'+
+      '" style="stroke:var(--line)" stroke-width="1"/><text x="'+(padL-8)+'" y="'+(yy+4)+
+      '" text-anchor="end" font-size="11" font-family="IBM Plex Mono, monospace" style="fill:var(--muted)">'+
       Math.round(top*t)+'</text>';
   });
   const pts = data.map(function(d,i){ return x(i).toFixed(1)+","+y(d.score).toFixed(1); }).join(" ");
@@ -2271,7 +2335,7 @@ function renderHistory(){
   data.forEach(function(d,i){
     const last = i === data.length-1;
     dots += '<circle cx="'+x(i).toFixed(1)+'" cy="'+y(d.score).toFixed(1)+'" r="'+(last?5:3.2)+
-      '" fill="'+(last?"#EC7A28":"#2F6FD0")+'" stroke="#FFFFFF" stroke-width="1.5"><title>'+
+      '" fill="'+(last?"#EC7A28":"#2F6FD0")+'" style="stroke:var(--card)" stroke-width="1.5"><title>'+
       new Date(d.at).toLocaleDateString()+"  ·  "+d.score+" points, "+d.correct+"/"+d.total+
       ' correct</title></circle>';
   });
@@ -2285,7 +2349,7 @@ function renderHistory(){
     '<text x="'+(W-padR)+'" y="'+(y(lastD.score)-12).toFixed(1)+'" text-anchor="end" font-size="12" '+
     'font-family="IBM Plex Mono, monospace" font-weight="600" fill="#EC7A28">'+lastD.score+'</text>'+
     '<text x="'+padL+'" y="'+(H-6)+'" font-size="11" font-family="IBM Plex Mono, monospace" '+
-    'fill="#6E7480">'+data.length+' most recent rounds</text></svg>';
+    'style="fill:var(--muted)">'+data.length+' most recent rounds</text></svg>';
   panel.hidden = false;
 }
 
@@ -2627,6 +2691,34 @@ $("btnSound").addEventListener("click", function(){
   this.textContent = sound ? "Sound on" : "Sound off";
   if(sound) sfx.tick();
 });
+/* ---- theme ----
+   The head script already set data-theme before paint. Until someone taps the
+   button, the game keeps following the device; after that, their choice sticks. */
+const THEME_KEY = "nz.theme";
+const darkQuery = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+function setTheme(dark){
+  document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+  $("btnTheme").setAttribute("aria-pressed", dark ? "true" : "false");
+  $("btnTheme").textContent = dark ? "Dark on" : "Dark off";
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if(meta) meta.setAttribute("content", dark ? "#12171E" : "#F5F3ED");
+}
+setTheme(document.documentElement.getAttribute("data-theme") === "dark");
+$("btnTheme").addEventListener("click", function(){
+  const dark = document.documentElement.getAttribute("data-theme") !== "dark";
+  setTheme(dark);
+  try{ localStorage.setItem(THEME_KEY, dark ? "dark" : "light"); }catch(e){}
+});
+if(darkQuery){
+  const follow = function(e){
+    let saved = null;
+    try{ saved = localStorage.getItem(THEME_KEY); }catch(err){}
+    if(!saved) setTheme(e.matches);
+  };
+  if(darkQuery.addEventListener) darkQuery.addEventListener("change", follow);
+  else if(darkQuery.addListener) darkQuery.addListener(follow);
+}
+
 $("btnSwitch").addEventListener("click", function(){ renderPlayers(); show("s-players"); });
 $("btnPause").addEventListener("click", pause);
 $("btnQuit").addEventListener("click", function(){

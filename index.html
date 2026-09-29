@@ -1700,7 +1700,11 @@ function startRound(){
   run.armed = false;
   run.locked = true;
   $("hudClock").hidden = false;
-  $("hudClock").textContent = run.mode === "sprint" ? run.seconds.toFixed(1)+"s" : "—";
+  /* Show the time the first problem will get, never a placeholder dash: while
+     the mic is being fetched this can sit on screen for seconds, and a lone
+     "—" read as a minus sign. */
+  const firstMs = run.mode === "sprint" ? run.seconds*1000 : problemLimit();
+  $("hudClock").textContent = (firstMs/1000).toFixed(1)+"s";
 
   if(!canTalk){
     voiceStop(); releaseMic(); updateMicNotice();

@@ -1,0 +1,2751 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#F5F3ED">
+<meta name="description" content="A speedy math facts game: sprint and survival rounds for addition, subtraction, multiplication and division.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<title>Number Zoomies</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  /* Cuisenaire-rod palette: the colours elementary math is already taught in */
+  --paper:#F5F3ED;
+  --card:#FFFFFF;
+  --grid:rgba(26,36,48,.055);
+  --ink:#1A2430;
+  --muted:#6E7480;
+  --line:#DDD9CE;
+  --line-strong:#C6C1B2;
+
+  --op-add:#2F6FD0;
+  --op-sub:#7B4FBF;
+  --op-mul:#EC7A28;
+  --op-div:#0E9594;
+
+  --good:#3FA34D;
+  --good-soft:#E4F3E6;
+  --bad:#E5484D;
+  --bad-soft:#FCE7E7;
+  --gold:#F2B705;
+
+  --r-sm:8px; --r-md:14px; --r-lg:22px;
+  --shadow:0 2px 0 var(--line-strong);
+  --shadow-lift:0 6px 0 var(--line-strong);
+
+  --f-display:"Fredoka","Trebuchet MS",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",monospace;
+}
+
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+body{
+  margin:0;
+  font-family:var(--f-body);
+  color:var(--ink);
+  background-color:var(--paper);
+  background-image:
+    linear-gradient(var(--grid) 1px,transparent 1px),
+    linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:28px 28px;
+  -webkit-font-smoothing:antialiased;
+}
+button{font:inherit;color:inherit;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+h1,h2,h3{margin:0;font-family:var(--f-display);font-weight:600;text-wrap:balance;line-height:1.15}
+
+.wrap{max-width:940px;margin:0 auto;padding-inline:16px;padding-block:18px 56px}
+
+/* ---------- top bar ---------- */
+.topbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--f-display);font-weight:700;font-size:1.25rem;letter-spacing:-.01em}
+.brand .rods{display:flex;gap:3px}
+.brand .rods i{display:block;width:7px;border-radius:2px}
+.brand .rods i:nth-child(1){height:14px;background:var(--op-add)}
+.brand .rods i:nth-child(2){height:20px;background:var(--op-sub)}
+.brand .rods i:nth-child(3){height:26px;background:var(--op-mul)}
+.brand .rods i:nth-child(4){height:32px;background:var(--op-div)}
+.brand .rods{align-items:flex-end}
+.topbar .spacer{flex:1}
+
+.ghost{
+  border:2px solid var(--line-strong);background:var(--card);border-radius:999px;
+  padding:7px 14px;font-size:.85rem;font-weight:600;box-shadow:var(--shadow);
+}
+.ghost:hover{background:var(--paper)}
+.ghost[aria-pressed="false"]{opacity:.55}
+
+/* ---------- screens ---------- */
+.screen{display:none}
+.screen.on{display:block}
+
+.panel{
+  background:var(--card);border:2px solid var(--line);border-radius:var(--r-lg);
+  padding:22px;box-shadow:var(--shadow-lift);
+}
+.panel + .panel{margin-top:18px}
+.panel-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.eyebrow{
+  font-family:var(--f-mono);font-size:.68rem;font-weight:600;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--muted);
+}
+
+/* ---------- players ---------- */
+.players{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px}
+.player-chip{
+  display:flex;align-items:center;gap:10px;border:2px solid var(--line-strong);
+  background:var(--card);border-radius:999px;padding:8px 8px 8px 14px;box-shadow:var(--shadow);
+  font-weight:600;
+}
+.player-chip .go{
+  border:0;background:var(--ink);color:#fff;border-radius:999px;
+  width:30px;height:30px;font-size:.9rem;line-height:1;
+}
+.player-chip .del{border:0;background:none;color:var(--muted);font-size:1rem;padding:0 4px}
+.player-chip .del:hover{color:var(--bad)}
+.newplayer{display:flex;gap:10px;flex-wrap:wrap}
+input[type="text"]{
+  font:inherit;font-weight:600;border:2px solid var(--line-strong);border-radius:999px;
+  padding:9px 16px;background:var(--paper);color:var(--ink);min-width:0;flex:1 1 180px;
+}
+input[type="text"]:focus-visible,button:focus-visible,select:focus-visible{
+  outline:3px solid var(--op-add);outline-offset:2px;
+}
+
+/* ---------- setup ---------- */
+.field{margin-bottom:22px}
+.field:last-child{margin-bottom:0}
+.field > .label{
+  font-family:var(--f-mono);font-size:.68rem;font-weight:600;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--muted);display:block;margin-bottom:9px;
+}
+.chips{display:flex;flex-wrap:wrap;gap:9px}
+.chip{
+  border:2px solid var(--line-strong);background:var(--card);border-radius:var(--r-md);
+  padding:10px 15px;font-weight:600;font-size:.92rem;box-shadow:var(--shadow);
+  display:flex;align-items:center;gap:8px;
+}
+.chip .dot{width:12px;height:12px;border-radius:3px;background:var(--line-strong)}
+.chip[aria-pressed="true"]{border-color:var(--ink);background:var(--paper)}
+.chip[aria-pressed="true"] .dot{background:var(--c)}
+.chip.op[aria-pressed="true"]{border-color:var(--c);box-shadow:0 2px 0 var(--c)}
+.chip .sym{font-family:var(--f-display);font-size:1.15rem;line-height:1;color:var(--c)}
+.chip[aria-pressed="false"] .sym{color:var(--muted)}
+
+.modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+.mode{
+  text-align:left;border:2px solid var(--line-strong);background:var(--card);
+  border-radius:var(--r-md);padding:14px 16px;box-shadow:var(--shadow);
+}
+.mode[aria-pressed="true"]{border-color:var(--ink);box-shadow:var(--shadow-lift)}
+.mode strong{display:block;font-family:var(--f-display);font-size:1.1rem;margin-bottom:3px}
+.mode span{display:block;font-size:.84rem;color:var(--muted);line-height:1.45}
+
+.range-custom{display:flex;align-items:center;gap:8px;font-size:.9rem;font-weight:600}
+select{
+  font:inherit;font-weight:600;border:2px solid var(--line-strong);border-radius:var(--r-sm);
+  padding:7px 10px;background:var(--card);color:var(--ink);
+}
+.diffrow{display:flex;align-items:center;gap:14px;max-width:480px}
+input[type="range"]{flex:1;min-width:0;height:30px;accent-color:var(--op-mul);cursor:pointer}
+.diffname{font-family:var(--f-display);font-weight:600;font-size:1.05rem;min-width:5.5ch}
+.ticks{display:flex;justify-content:space-between;max-width:calc(480px - 5.5ch - 14px);
+  font-family:var(--f-mono);font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);font-weight:600;margin-top:-4px}
+.diffnote{font-size:.84rem;color:var(--muted);line-height:1.5;margin:10px 0 0;max-width:62ch}
+
+.more{border:2px solid var(--line);border-radius:var(--r-md);margin-bottom:22px;
+  background:var(--paper);overflow:hidden}
+.more summary{cursor:pointer;padding:13px 16px;font-family:var(--f-display);font-weight:600;
+  font-size:1rem;list-style:none;display:flex;align-items:center;gap:10px}
+.more summary::-webkit-details-marker{display:none}
+.more summary::before{content:"+";font-size:1.2rem;color:var(--muted);width:1ch;line-height:1}
+.more[open] summary::before{content:"\2212"}
+.more summary:hover{background:#EEEBE1}
+.more .inner{padding:4px 16px 18px}
+.more .field:last-child{margin-bottom:0}
+
+.toggles{display:flex;flex-direction:column;gap:10px}
+.toggle{display:flex;align-items:flex-start;gap:11px;font-size:.92rem;font-weight:500;text-align:left;
+  border:0;background:none;padding:0}
+.toggle .box{
+  flex:none;width:26px;height:26px;border-radius:var(--r-sm);border:2px solid var(--line-strong);
+  background:var(--card);display:grid;place-items:center;font-size:.85rem;color:transparent;font-weight:700;
+}
+.toggle[aria-pressed="true"] .box{background:var(--good);border-color:var(--good);color:#fff}
+.toggle em{display:block;font-style:normal;color:var(--muted);font-size:.82rem;line-height:1.4;margin-top:1px}
+
+.start{
+  width:100%;margin-top:6px;border:0;border-radius:var(--r-lg);background:var(--ink);color:#fff;
+  font-family:var(--f-display);font-size:1.5rem;font-weight:700;padding:18px;
+  box-shadow:0 5px 0 #0b1119;
+}
+.start:active{transform:translateY(3px);box-shadow:0 2px 0 #0b1119}
+.start:disabled{background:var(--line-strong);box-shadow:none;cursor:not-allowed}
+
+/* ---------- play ---------- */
+.hud{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.hud .who{font-family:var(--f-display);font-size:1.05rem}
+.hud .stat{
+  font-family:var(--f-mono);font-size:.8rem;font-weight:600;background:var(--card);
+  border:2px solid var(--line);border-radius:999px;padding:5px 12px;font-variant-numeric:tabular-nums;
+}
+.hud .stat b{font-size:.95rem}
+.lives{display:flex;gap:5px}
+.lives i{display:block;width:16px;height:26px;border-radius:4px;background:var(--op-sub);
+  border:2px solid rgba(0,0,0,.15);transition:.25s}
+.lives i.gone{background:var(--line);border-color:var(--line-strong);transform:scaleY(.55)}
+
+/* segmented rod timer */
+.rod{display:flex;gap:3px;height:18px;margin-bottom:20px}
+.rod i{flex:1;border-radius:3px;background:var(--line);transition:background .12s linear}
+.rod i.lit{background:var(--op-div)}
+.rod.warn i.lit{background:var(--gold)}
+.rod.danger i.lit{background:var(--bad)}
+
+.stage{
+  background:var(--card);border:2px solid var(--line);border-radius:var(--r-lg);
+  box-shadow:var(--shadow-lift);padding:26px 20px 22px;text-align:center;position:relative;overflow:hidden;
+}
+.stage::before{
+  content:"";position:absolute;inset:0;background:var(--flash,transparent);opacity:0;pointer-events:none;
+  transition:opacity .16s;
+}
+.stage.hit::before{background:var(--good-soft);opacity:1}
+.stage.miss::before{background:var(--bad-soft);opacity:1}
+.stage > *{position:relative}
+.stage{transition:border-color .35s,box-shadow .35s}
+.stage[data-tier="1"]{border-color:#EFD79B}
+.stage[data-tier="2"]{border-color:var(--gold);
+  box-shadow:var(--shadow-lift),0 0 0 4px rgba(242,183,5,.15)}
+.stage[data-tier="3"]{border-color:var(--op-mul);
+  box-shadow:var(--shadow-lift),0 0 0 6px rgba(236,122,40,.18)}
+
+/* celebration lives in the outer margins so the equation stays clean */
+.stage > .sparkles{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:0}
+.sparkles b{position:absolute;opacity:0;background:var(--c);
+  width:var(--sz,10px);height:var(--sz,10px);animation:spark 1.5s ease-out forwards}
+
+.fx-confetti b{border-radius:2px}
+@keyframes spark{
+  0%{opacity:0;transform:translateY(14px) scale(.3) rotate(45deg)}
+  20%{opacity:1}
+  100%{opacity:0;transform:translateY(-82px) scale(1.05) rotate(205deg)}
+}
+.fx-blast b{border-radius:1px;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);
+  animation-name:fxblast;filter:drop-shadow(0 0 4px rgba(255,140,0,.55))}
+@keyframes fxblast{
+  0%{opacity:0;transform:translateY(20px) scale(.15) rotate(0deg)}
+  12%{opacity:1}
+  100%{opacity:0;transform:translateY(-116px) scale(1.15) rotate(340deg)}
+}
+.fx-bloom b{border-radius:50%;animation-name:fxbloom;
+  box-shadow:0 0 8px 1px rgba(255,255,255,.65)}
+@keyframes fxbloom{
+  0%{opacity:0;transform:translateY(8px) scale(.2)}
+  28%{opacity:.95}
+  100%{opacity:0;transform:translateY(-62px) scale(1.35)}
+}
+.fx-bubbles b{border-radius:50%;background:transparent;border:2px solid var(--c);
+  box-shadow:inset -2px -2px 0 rgba(255,255,255,.55);animation-name:fxbubbles}
+@keyframes fxbubbles{
+  0%{opacity:0;transform:translateY(24px) scale(.45)}
+  18%{opacity:.9}
+  100%{opacity:0;transform:translateY(-100px) scale(1.2)}
+}
+.fx-pixels b{border-radius:0;animation-name:fxpixels;animation-timing-function:steps(9,end)}
+@keyframes fxpixels{
+  0%{opacity:0;transform:translateY(14px)}
+  10%{opacity:1}
+  100%{opacity:0;transform:translateY(-80px)}
+}
+
+.fxpreview{position:relative;height:88px;border:2px dashed var(--line-strong);
+  border-radius:var(--r-md);overflow:hidden;background:var(--paper);margin-top:12px;
+  display:grid;place-items:center}
+.fxpreview span{font-size:.82rem;color:var(--muted);font-weight:600}
+.hud .stat.hot{border-color:var(--gold);background:#FFF8E3;color:#7A5A00}
+.hud .stat.bump{animation:bump .34s ease-out}
+@keyframes bump{40%{transform:scale(1.16)}}
+
+.op-tag{
+  display:inline-block;font-family:var(--f-mono);font-size:.68rem;font-weight:600;letter-spacing:.14em;
+  text-transform:uppercase;padding:4px 12px;border-radius:999px;color:#fff;background:var(--op-add);
+}
+.equation{
+  font-family:var(--f-display);font-weight:700;line-height:1;letter-spacing:-.02em;
+  font-size:clamp(2.9rem,13vw,5rem);margin:16px 0 4px;
+  display:flex;align-items:center;justify-content:center;gap:.18em;flex-wrap:wrap;
+  font-variant-numeric:tabular-nums;
+}
+.equation .o{color:var(--op)}
+.equation .eq{color:var(--line-strong)}
+.slot{
+  min-width:2.2ch;border-bottom:8px solid var(--op);border-radius:3px;padding:0 .06em;
+  color:var(--op);
+}
+.slot.empty{color:var(--line-strong)}
+.stage.miss .slot{color:var(--bad);border-bottom-color:var(--bad)}
+.stage.hit .slot{color:var(--good);border-bottom-color:var(--good)}
+.caret{display:inline-block;width:.07em;height:.85em;background:currentColor;vertical-align:-.06em;
+  animation:blink 1.05s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.hud .mic{display:flex;align-items:center;gap:7px;cursor:pointer;border-color:var(--line-strong)}
+.hud .mic[aria-pressed="true"]{border-color:var(--op-div);background:#E3F5F4;color:#065C5B}
+.dotmic{width:9px;height:9px;border-radius:50%;background:var(--line-strong);flex:none}
+.hud .mic[aria-pressed="true"] .dotmic{background:var(--op-div);animation:pulse 1.4s ease-in-out infinite}
+.hud .mic.err{border-color:var(--bad);background:var(--bad-soft);color:#8E1F22}
+.hud .mic.err .dotmic{background:var(--bad);animation:none}
+.hud .mic.warn{border-color:var(--gold);background:#FFF8E3;color:#7A5A00}
+.hud .mic.warn .dotmic{background:var(--gold);animation:none}
+@keyframes pulse{50%{opacity:.25}}
+.notice{background:#FFF4D6;border:2px solid var(--gold);border-radius:var(--r-md);
+  padding:11px 14px;font-size:.85rem;line-height:1.55;margin-bottom:12px;color:#5A4300}
+.notice b{font-weight:700}
+.notice code{font-family:var(--f-mono);font-size:.95em;background:#F7E6B8;
+  padding:1px 5px;border-radius:4px}
+.heard{min-height:20px;font-family:var(--f-mono);font-size:.78rem;color:var(--muted);
+  font-weight:500;margin-top:2px}
+.heard b{color:var(--ink);font-weight:600}
+.voicetest{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px}
+
+.verdict{min-height:26px;font-weight:700;font-size:1rem;font-family:var(--f-display)}
+.verdict.ok{color:var(--good)}
+.verdict.no{color:var(--bad)}
+.hint{color:var(--muted);font-size:.84rem;margin-top:2px}
+
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;max-width:330px;margin:18px auto 0}
+.keypad button{
+  border:2px solid var(--line-strong);background:var(--paper);border-radius:var(--r-md);
+  font-family:var(--f-display);font-weight:600;font-size:1.5rem;padding:12px 0;box-shadow:var(--shadow);
+  font-variant-numeric:tabular-nums;
+}
+.keypad button:active{transform:translateY(2px);box-shadow:none}
+.keypad .enter{grid-column:span 2;background:var(--ink);color:#fff;border-color:var(--ink);font-size:1.05rem;
+  box-shadow:0 2px 0 #0b1119}
+.keypad .back{font-size:1.2rem}
+
+.playfoot{display:flex;justify-content:center;gap:10px;margin-top:16px}
+
+.pause{
+  position:fixed;inset:0;background:rgba(26,36,48,.55);display:grid;place-items:center;z-index:40;padding:16px;
+}
+.pause .box{background:var(--card);border-radius:var(--r-lg);padding:26px;text-align:center;max-width:340px;
+  border:2px solid var(--line);box-shadow:var(--shadow-lift)}
+.pause h2{margin-bottom:14px}
+
+/* ---------- results ---------- */
+.hero{
+  background:var(--ink);color:#fff;border-radius:var(--r-lg);padding:26px 22px;text-align:center;
+  box-shadow:0 5px 0 #0b1119;
+}
+.hero .rank{font-family:var(--f-mono);font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--gold);font-weight:600}
+.hero .score{font-family:var(--f-display);font-weight:700;font-size:clamp(3rem,15vw,5rem);line-height:1;
+  margin:6px 0;font-variant-numeric:tabular-nums}
+.hero .sub{color:#B6BECA;font-size:.95rem}
+.hero .pb{display:inline-block;margin-top:12px;background:var(--gold);color:#3B2A00;font-weight:700;
+  border-radius:999px;padding:6px 16px;font-size:.85rem}
+
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-top:18px}
+.tile{background:var(--card);border:2px solid var(--line);border-radius:var(--r-md);padding:14px 16px}
+.tile .k{font-family:var(--f-mono);font-size:.65rem;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--muted);font-weight:600}
+.tile .v{font-family:var(--f-display);font-weight:700;font-size:1.9rem;line-height:1.1;margin-top:4px;
+  font-variant-numeric:tabular-nums}
+.tile .n{font-size:.78rem;color:var(--muted);margin-top:2px}
+
+.fluency{display:flex;height:34px;border-radius:var(--r-sm);overflow:hidden;border:2px solid var(--line)}
+.fluency div{display:grid;place-items:center;color:#fff;font-weight:700;font-size:.82rem;
+  font-variant-numeric:tabular-nums;min-width:0}
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;font-size:.8rem;color:var(--muted)}
+.legend span{display:flex;align-items:center;gap:6px}
+.legend i{width:12px;height:12px;border-radius:3px;display:block}
+
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{text-align:right;padding:9px 8px;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+thead th{font-family:var(--f-mono);font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);font-weight:600;border-bottom:2px solid var(--line-strong)}
+td{font-variant-numeric:tabular-nums}
+td .opname{display:flex;align-items:center;gap:8px;font-weight:600}
+td .opname i{width:10px;height:18px;border-radius:3px;display:block}
+.scroll-x{overflow-x:auto}
+
+.tabs{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
+.tab{border:2px solid var(--line-strong);background:var(--card);border-radius:999px;padding:6px 14px;
+  font-weight:600;font-size:.85rem}
+.tab[aria-selected="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+.heat{display:grid;gap:3px;width:max-content;font-variant-numeric:tabular-nums}
+.heat .hc{width:26px;height:26px;border-radius:4px;display:grid;place-items:center;font-size:.62rem;
+  font-family:var(--f-mono);font-weight:600;color:rgba(0,0,0,.5);background:var(--line)}
+.heat .hh{width:26px;height:26px;display:grid;place-items:center;font-size:.65rem;font-family:var(--f-mono);
+  font-weight:600;color:var(--muted)}
+.heat .hc.miss{box-shadow:inset 0 0 0 2px var(--bad)}
+.heat-note{font-size:.82rem;color:var(--muted);margin-top:10px;line-height:1.5}
+
+.fam{display:grid;gap:4px;width:max-content;grid-template-columns:auto repeat(13,30px);
+  align-items:center}
+.fam .flabel{font-weight:600;font-size:.82rem;padding-right:10px;white-space:nowrap;
+  display:flex;align-items:center;gap:7px}
+.fam .flabel i{width:9px;height:16px;border-radius:2px;display:block}
+.fam .fh{height:20px;display:grid;place-items:center;font-family:var(--f-mono);
+  font-size:.66rem;font-weight:600;color:var(--muted)}
+.fam .fc{height:30px;border-radius:5px;display:grid;place-items:center;font-family:var(--f-mono);
+  font-size:.68rem;font-weight:600;color:rgba(0,0,0,.55);background:var(--line)}
+.lead{font-size:.95rem;line-height:1.55;margin:0 0 14px}
+.lead b{font-weight:700}
+
+.trouble{display:flex;flex-wrap:wrap;gap:8px}
+.tf{border:2px solid var(--line-strong);background:var(--card);border-radius:var(--r-sm);padding:7px 11px;
+  font-family:var(--f-mono);font-weight:600;font-size:.85rem;display:flex;align-items:center;gap:8px}
+.tf small{color:var(--muted);font-weight:500}
+
+.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:20px}
+.btn{
+  border:0;border-radius:var(--r-md);padding:14px 22px;font-family:var(--f-display);font-weight:600;
+  font-size:1.05rem;background:var(--ink);color:#fff;box-shadow:0 4px 0 #0b1119;flex:1 1 180px;
+}
+.btn:active{transform:translateY(2px);box-shadow:0 2px 0 #0b1119}
+.btn.alt{background:var(--card);color:var(--ink);border:2px solid var(--line-strong);box-shadow:var(--shadow)}
+.btn.drill{background:var(--op-mul);box-shadow:0 4px 0 #A9531A}
+
+.empty{color:var(--muted);font-size:.9rem;line-height:1.5}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* confetti */
+.confetti{position:fixed;inset:0;pointer-events:none;z-index:60;overflow:hidden}
+.confetti i{position:absolute;top:-14px;width:9px;height:16px;border-radius:2px;
+  animation:fall linear forwards}
+@keyframes fall{to{transform:translateY(105vh) rotate(var(--spin));opacity:.15}}
+
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001ms !important;transition-duration:.001ms !important}
+}
+@media (max-width:520px){
+  .panel{padding:18px 15px}
+  .keypad{max-width:100%}
+}
+/* installed on a phone: keep clear of the notch and gesture bar */
+.wrap{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));
+  padding-bottom:max(56px,env(safe-area-inset-bottom))}
+
+/* ---------- moving stats between devices ---------- */
+.backup{margin-top:18px}
+.backup .row{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+.backup textarea{width:100%;min-height:90px;margin-top:10px;font-family:var(--f-mono);font-size:.75rem;
+  border:2px solid var(--line-strong);border-radius:var(--r-sm);padding:8px;background:var(--paper);
+  color:var(--ink);resize:vertical}
+.backup .msg{min-height:20px;margin-top:8px}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="topbar">
+    <div class="brand"><span class="rods"><i></i><i></i><i></i><i></i></span> Number Zoomies</div>
+    <div class="spacer"></div>
+    <button class="ghost" id="btnSound" aria-pressed="true">Sound on</button>
+    <button class="ghost" id="btnSwitch" hidden>Switch player</button>
+  </header>
+
+  <!-- ============ PLAYERS ============ -->
+  <section class="screen" id="s-players">
+    <div class="panel">
+      <div class="panel-head">
+        <h1>Who's playing?</h1>
+        <span class="eyebrow">Each player keeps their own stats</span>
+      </div>
+      <div class="players" id="playerList"></div>
+      <form class="newplayer" id="newPlayerForm">
+        <input type="text" id="newPlayerName" placeholder="Add a new player" maxlength="14" autocomplete="off">
+        <button class="ghost" type="submit">Add player</button>
+      </form>
+    </div>
+
+    <details class="more backup" id="backupBox">
+      <summary>Move stats to another device</summary>
+      <div class="inner">
+        <p class="diffnote" style="margin-top:0">Each device keeps its own players. To move them, save a
+          backup here, then load it on the other device. Loading adds players and updates ones with the
+          same name — it never deletes anyone.</p>
+        <div class="row">
+          <button class="ghost" id="btnExportFile">Save backup file</button>
+          <button class="ghost" id="btnImportFile">Load backup file</button>
+          <input type="file" id="importFile" accept=".json,application/json" hidden>
+        </div>
+        <div class="row">
+          <button class="ghost" id="btnExportCopy">Copy backup as text</button>
+          <button class="ghost" id="btnImportPaste">Load pasted text</button>
+        </div>
+        <textarea id="importText" placeholder="Paste backup text here, then tap Load pasted text" spellcheck="false"></textarea>
+        <p class="diffnote msg" id="backupMsg" aria-live="polite"></p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ SETUP ============ -->
+  <section class="screen" id="s-setup">
+    <div class="panel">
+      <div class="panel-head">
+        <h1 id="setupTitle">Pick your practice</h1>
+        <span class="eyebrow" id="setupBest"></span>
+      </div>
+
+      <div class="field">
+        <span class="label">Operations</span>
+        <div class="chips" id="opChips"></div>
+      </div>
+
+      <div class="field">
+        <span class="label">Number range</span>
+        <div class="chips" id="rangeChips" style="margin-bottom:10px"></div>
+        <div class="range-custom" id="rangeCustom" hidden>
+          <label for="rangeMin">From</label>
+          <select id="rangeMin"></select>
+          <label for="rangeMax">to</label>
+          <select id="rangeMax"></select>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="label">Game mode</span>
+        <div class="modes" id="modeCards">
+          <button class="mode" data-mode="sprint" aria-pressed="true">
+            <strong>Sprint</strong>
+            <span>Beat the clock. Answer as many as you can before time runs out.</span>
+          </button>
+          <button class="mode" data-mode="survival" aria-pressed="false">
+            <strong>Survival</strong>
+            <span>Lives, not a clock. Every right answer trims the time you get for the next
+              one &mdash; steeply at first, then more gently. Difficulty sets the pacing.</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="field" id="secondsField">
+        <span class="label">Sprint length</span>
+        <div class="chips" id="secChips"></div>
+      </div>
+
+      <div class="field">
+        <span class="label">Difficulty</span>
+        <div class="diffrow">
+          <input type="range" id="diffSlider" min="1" max="5" step="1" value="3"
+                 aria-describedby="diffNote">
+          <span class="diffname" id="diffName">Normal</span>
+        </div>
+        <div class="ticks"><span>Gentle</span><span>Fierce</span></div>
+        <p class="diffnote" id="diffNote"></p>
+      </div>
+
+      <details class="more" id="moreSettings">
+        <summary>More settings</summary>
+        <div class="inner">
+          <div class="field">
+            <span class="label">Adaptive practice</span>
+            <div class="chips" id="adaptChips"></div>
+            <p class="diffnote" id="adaptNote"></p>
+          </div>
+
+          <div class="field">
+            <span class="label">Answers</span>
+            <div class="toggles">
+              <button class="toggle" id="tgAuto" aria-pressed="true">
+                <span class="box" aria-hidden="true">✓</span>
+                <span>Jump ahead on a correct answer
+                  <em>Off means you press Enter to send every answer.</em></span>
+              </button>
+              <button class="toggle" id="tgVoice" aria-pressed="false">
+                <span class="box" aria-hidden="true">✓</span>
+                <span>Answer out loud
+                  <em id="voiceNote">Say the answer instead of typing. The keypad keeps working either way.</em></span>
+              </button>
+            </div>
+            <div class="voicetest">
+              <button class="ghost" id="btnMicTest">Test microphone</button>
+              <span class="diffnote" id="micTestOut" style="margin:0"></span>
+            </div>
+          </div>
+
+          <div class="field">
+            <span class="label">Celebration</span>
+            <div class="chips" id="fxStyleChips" style="margin-bottom:10px"></div>
+            <div class="chips" id="fxAmountChips"></div>
+            <div class="fxpreview sparkles" id="fxPreview"><span id="fxPreviewNote">Tap a style to see it</span></div>
+          </div>
+        </div>
+      </details>
+
+      <button class="start" id="btnStart">Start</button>
+    </div>
+  </section>
+
+  <!-- ============ PLAY ============ -->
+  <section class="screen" id="s-play">
+    <div class="notice" id="micNotice" hidden></div>
+    <div class="hud">
+      <span class="who" id="hudWho">—</span>
+      <span class="stat">Score <b id="hudScore">0</b></span>
+      <span class="stat" id="hudStreakChip">Streak <b id="hudStreak">0</b></span>
+      <button class="stat mic" id="hudMic" hidden aria-pressed="false">
+        <span class="dotmic" aria-hidden="true"></span><span id="micState">Mic off</span>
+      </button>
+      <div class="spacer" style="flex:1"></div>
+      <span class="stat" id="hudClock">60.0s</span>
+      <div class="lives" id="hudLives" hidden></div>
+    </div>
+
+    <div class="rod" id="rod"></div>
+
+    <div class="stage" id="stage" data-tier="0">
+      <div class="sparkles" id="sparkles" aria-hidden="true"></div>
+      <span class="op-tag" id="opTag">Addition</span>
+      <div class="equation" id="equation"></div>
+      <div class="verdict" id="verdict"></div>
+      <div class="heard" id="heard"></div>
+      <div class="hint" id="playHint"></div>
+
+      <div class="keypad" id="keypad">
+        <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+        <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+        <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+        <button class="back" data-k="back">⌫</button>
+        <button data-k="0">0</button>
+        <button class="enter" data-k="enter" style="grid-column:auto">Enter</button>
+      </div>
+    </div>
+
+    <div class="playfoot">
+      <button class="ghost" id="btnPause">Pause (Esc)</button>
+      <button class="ghost" id="btnQuit">End round</button>
+    </div>
+    <p class="vh" id="live" aria-live="polite"></p>
+  </section>
+
+  <!-- ============ RESULTS ============ -->
+  <section class="screen" id="s-results">
+    <div class="hero">
+      <div class="rank" id="rRank">Round complete</div>
+      <div class="score" id="rScore">0</div>
+      <div class="sub" id="rSub"></div>
+      <div id="rPB"></div>
+    </div>
+
+    <div class="tiles" id="rTiles"></div>
+    <p class="lead" id="rVoiceNote" style="margin:16px 0 0" hidden></p>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>How fluent was it?</h2>
+        <span class="eyebrow">By answer time</span>
+      </div>
+      <div class="fluency" id="rFluency"></div>
+      <div class="legend">
+        <span><i style="background:var(--good)"></i> Fluent — under 3s</span>
+        <span><i style="background:var(--gold)"></i> Developing — 3 to 6s</span>
+        <span><i style="background:var(--op-mul)"></i> Not yet — over 6s</span>
+        <span><i style="background:var(--bad)"></i> Missed</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Every answer, in order</h2>
+        <span class="eyebrow">Seconds per problem</span>
+      </div>
+      <div id="rTrace"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Operation breakdown</h2>
+        <span class="eyebrow">This round</span>
+      </div>
+      <div class="scroll-x"><table id="rTable"></table></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Fact grid</h2>
+        <span class="eyebrow">All rounds, this player</span>
+      </div>
+      <div class="tabs" id="rHeatTabs"></div>
+      <div class="scroll-x"><div id="rHeat"></div></div>
+      <div class="legend" style="margin-top:12px">
+        <span><i style="background:#3FA34D"></i> under 1.5s</span>
+        <span><i style="background:#9BC53D"></i> 1.5–3s</span>
+        <span><i style="background:#F2B705"></i> 3–6s</span>
+        <span><i style="background:#EC7A28"></i> over 6s</span>
+        <span><i style="background:#DDD9CE"></i> not tried yet</span>
+        <span><i style="box-shadow:inset 0 0 0 2px #E5484D;background:#fff"></i> missed before</span>
+      </div>
+      <p class="heat-note" id="rHeatNote"></p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Fact families</h2>
+        <span class="eyebrow">Which numbers are the sticking point</span>
+      </div>
+      <p class="lead" id="rFamLead"></p>
+      <div class="scroll-x"><div id="rFamGrid"></div></div>
+      <div class="legend" style="margin-top:12px">
+        <span><i style="background:#3FA34D"></i> fluent</span>
+        <span><i style="background:#9BC53D"></i> nearly there</span>
+        <span><i style="background:#F2B705"></i> slow</span>
+        <span><i style="background:#EC7A28"></i> shaky</span>
+        <span><i style="background:#E5484D"></i> missing a lot</span>
+        <span><i style="background:#DDD9CE"></i> under 4 tries</span>
+      </div>
+      <div class="actions" id="rFamDrill"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Facts to work on</h2>
+        <span class="eyebrow">Slowest and most missed</span>
+      </div>
+      <div class="trouble" id="rTrouble"></div>
+      <div class="actions" id="rDrillWrap"></div>
+    </div>
+
+    <div class="panel" id="rHistoryPanel">
+      <div class="panel-head">
+        <h2>Progress</h2>
+        <span class="eyebrow" id="rHistLabel"></span>
+      </div>
+      <div id="rHistory"></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn" id="btnAgain">Play again</button>
+      <button class="btn alt" id="btnSettings">Change settings</button>
+      <button class="btn alt" id="btnCopy">Copy summary</button>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================================================
+   Constants
+   ============================================================ */
+const OPS = {
+  add:{sym:"+", name:"Addition",       color:"#2F6FD0", short:"Add"},
+  sub:{sym:"−", name:"Subtraction", color:"#7B4FBF", short:"Subtract"},
+  mul:{sym:"×", name:"Multiplication", color:"#EC7A28", short:"Multiply"},
+  div:{sym:"÷", name:"Division",   color:"#0E9594", short:"Divide"}
+};
+const OP_ORDER = ["add","sub","mul","div"];
+const GRID_NOTE = {
+  add:"Rows are the first number, columns the second. Colour shows your typical answer time.",
+  sub:"Every subtraction comes from an addition pair, so answers are never negative. Rows are the answer, columns the number taken away.",
+  mul:"Rows and columns are the two factors. Colour shows your typical answer time.",
+  div:"Every division comes from a multiplication pair, so there are never remainders. Rows are the answer, columns the divisor."
+};
+const RANK_STEPS = [
+  [0,"Warming up"],[80,"Getting quick"],[180,"Fact finder"],[320,"Speed climber"],
+  [500,"Lightning hands"],[720,"Fact master"],[1000,"Unstoppable"]
+];
+const STORE_KEY = "factdash.v1";
+const FLUENT_MS = 3000, DEVELOPING_MS = 6000;
+const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ============================================================
+   Storage (best-effort; never load-bearing)
+   ============================================================ */
+function loadDB(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(raw){ const d = JSON.parse(raw); if(d && d.players) return d; }
+  }catch(e){}
+  return {players:{}, last:null};
+}
+function saveDB(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }catch(e){} }
+
+let DB = loadDB();
+let player = null;
+let cfg = {
+  ops:["add","sub","mul","div"], min:0, max:12, rangePreset:"0-12",
+  mode:"sprint", seconds:60, autoAdvance:true, adaptive:"balanced", diff:3,
+  drill:null, drillFam:null, sparkStyle:"confetti", sparkAmount:"normal", voice:false
+};
+
+/* ---- spoken-number parsing ----
+   Recognizers hand back a mix of digits ("42"), words ("forty two"), digit runs
+   ("four two") and near-misses that sound like numbers. */
+const NUMWORD = {
+  zero:0, oh:0, o:0, nought:0, one:1, two:2, three:3, four:4, five:5, six:6, seven:7,
+  eight:8, nine:9, ten:10, eleven:11, twelve:12, thirteen:13, fourteen:14, fifteen:15,
+  sixteen:16, seventeen:17, eighteen:18, nineteen:19, twenty:20, thirty:30, forty:40,
+  fifty:50, sixty:60, seventy:70, eighty:80, ninety:90, hundred:100
+};
+const HOMOPHONE = {
+  to:"two", too:"two", tu:"two", tew:"two", tue:"two",
+  for:"four", fore:"four", faux:"four", foure:"four", four:"four",
+  ate:"eight", ait:"eight", eigth:"eight",
+  won:"one", wan:"one", juan:"one", wun:"one",
+  sex:"six", sicks:"six", sics:"six",
+  tree:"three", free:"three", thee:"three", tri:"three",
+  nein:"nine", nyne:"nine",
+  hero:"zero", zeroh:"zero",
+  tan:"ten", tenn:"ten",
+  fourty:"forty", fivety:"fifty", ninty:"ninety", twelth:"twelve",
+  fourteen:"fourteen", eightteen:"eighteen", hundread:"hundred", hunred:"hundred"
+};
+
+function evalGroup(vals){
+  if(!vals.length) return null;
+  /* "four two" / "one four four" said digit by digit */
+  if(vals.length > 1 && vals.every(function(v){ return v < 10; }))
+    return parseInt(vals.join(""), 10);
+  let total = 0, cur = 0;
+  for(let i=0;i<vals.length;i++){
+    const v = vals[i];
+    if(v === 100){ cur = (cur === 0 ? 1 : cur) * 100; total += cur; cur = 0; }
+    else cur += v;
+  }
+  return total + cur;
+}
+
+function parseSpoken(text){
+  if(!text) return null;
+  const words = String(text).toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, " ").replace(/-/g, " ")
+    .split(/\s+/).filter(Boolean);
+  const groups = [];
+  let cur = [];
+  for(let i=0;i<words.length;i++){
+    let w = words[i];
+    if(HOMOPHONE[w]) w = HOMOPHONE[w];
+    if(/^\d+$/.test(w)){
+      if(w.length > 1){ if(cur.length){ groups.push(cur); cur = []; } groups.push([parseInt(w,10)]); }
+      else cur.push(parseInt(w,10));
+      continue;
+    }
+    if(NUMWORD[w] !== undefined){ cur.push(NUMWORD[w]); continue; }
+    if(cur.length){ groups.push(cur); cur = []; }
+  }
+  if(cur.length) groups.push(cur);
+  if(!groups.length) return null;
+  /* last number wins, so self-corrections ("thirty... no, thirty five") land right */
+  const v = evalGroup(groups[groups.length-1]);
+  return (v === null || v < 0 || v > 999) ? null : v;
+}
+/* Survival pacing: 9s at the start, easing toward a 1s floor. Big early drops,
+   then an ever-gentler taper, so the wall arrives slowly instead of all at once. */
+/* Difficulty. Level 3 is the baseline: 9s start, 2s floor, as specified.
+   Difficulty never touches which operations or numbers you practise — those stay
+   explicit choices — only the pacing, the cushion on a miss, and the scoring. */
+const DIFF = [
+  null,
+  {name:"Gentle", start:12000, decay:0.050, floor:3000, lives:4, showMiss:1600, mult:0.80},
+  {name:"Easy",   start:10000, decay:0.065, floor:2500, lives:3, showMiss:1300, mult:0.90},
+  {name:"Normal", start: 9000, decay:0.080, floor:2000, lives:3, showMiss:1000, mult:1.00},
+  {name:"Quick",  start: 7500, decay:0.100, floor:1600, lives:3, showMiss: 800, mult:1.15},
+  {name:"Fierce", start: 6000, decay:0.130, floor:1200, lives:2, showMiss: 600, mult:1.35}
+];
+function diff(){ return DIFF[cfg.diff] || DIFF[3]; }
+
+/* How hard the adaptive engine leans on your weak spots. `rate` is the share of
+   problems it steers; the rest come off a shuffled deck of every fact in range. */
+const ADAPT = {
+  off:     {name:"Off",      rate:0.00, pool:0},
+  light:   {name:"Light",    rate:0.15, pool:16},
+  balanced:{name:"Balanced", rate:0.30, pool:14},
+  strong:  {name:"Strong",   rate:0.55, pool:10}
+};
+const ADAPT_ORDER = ["off","light","balanced","strong"];
+function adapt(){ return ADAPT[cfg.adaptive] || ADAPT.balanced; }
+
+/* Celebration styles. Names stay short and neutral; the looks do the work. */
+const FX = {
+  confetti:{name:"Confetti", cls:"fx-confetti", size:10,
+            colors:["#F2B705","#EC7A28","#2F6FD0","#3FA34D","#7B4FBF"]},
+  blast:   {name:"Blast",    cls:"fx-blast",    size:13,
+            colors:["#FF6A00","#FFC400","#E5484D","#FFE99A"]},
+  bloom:   {name:"Bloom",    cls:"fx-bloom",    size:12,
+            colors:["#FF7EB6","#C77DFF","#FFB3D1","#F2B705","#8ED9FF"]},
+  bubbles: {name:"Bubbles",  cls:"fx-bubbles",  size:14,
+            colors:["#4FC3F7","#0E9594","#7FDBFF","#2F6FD0"]},
+  pixels:  {name:"Pixels",   cls:"fx-pixels",   size:9,
+            colors:["#2BD96B","#00C2D6","#F02FA0","#FFD400"]}
+};
+const FX_ORDER = ["confetti","blast","bloom","bubbles","pixels"];
+const AMOUNT = {
+  off:   {name:"Off",    mult:0},
+  light: {name:"Light",  mult:0.45},
+  normal:{name:"Normal", mult:1},
+  tons:  {name:"Tons",   mult:2.3}
+};
+const AMOUNT_ORDER = ["off","light","normal","tons"];
+function fxMult(){ return (AMOUNT[cfg.sparkAmount] || AMOUNT.normal).mult; }
+function fxStyle(){ return FX[cfg.sparkStyle] || FX.confetti; }
+let sound = true;
+let run = null, raf = 0, typed = "", recent = [], heatOp = null;
+let bag = [], bagKey = "";
+
+/* ============================================================
+   Small helpers
+   ============================================================ */
+const $ = function(id){ return document.getElementById(id); };
+function rnd(a,b){ return a + Math.floor(Math.random()*(b-a+1)); }
+function median(arr){
+  if(!arr || !arr.length) return 0;
+  const s = arr.slice().sort(function(x,y){return x-y;});
+  const m = s.length>>1;
+  return s.length%2 ? s[m] : (s[m-1]+s[m])/2;
+}
+function secs(ms){ return (ms/1000).toFixed(ms<10000?2:1); }
+function esc(s){ return String(s).replace(/[&<>"]/g, function(c){
+  return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+function show(id){
+  const list = ["s-players","s-setup","s-play","s-results"];
+  for(let i=0;i<list.length;i++) $(list[i]).classList.toggle("on", list[i]===id);
+  $("btnSwitch").hidden = !(player && (id==="s-setup"||id==="s-results"));
+  window.scrollTo(0,0);
+}
+
+/* ============================================================
+   Audio — generated, nothing loaded from outside
+   ============================================================ */
+let actx = null;
+function tone(freq, dur, type, vol, delay){
+  if(!sound) return;
+  try{
+    if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)();
+    if(actx.state === "suspended") actx.resume();
+    const t0 = actx.currentTime + (delay||0);
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type||"sine"; o.frequency.setValueAtTime(freq, t0);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol||0.16, t0+0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+    o.connect(g); g.connect(actx.destination);
+    o.start(t0); o.stop(t0+dur+0.02);
+  }catch(e){}
+}
+const sfx = {
+  ok:  function(){ tone(660,.10,"sine",.16,0); tone(990,.14,"sine",.14,.07); },
+  no:  function(){ tone(150,.20,"square",.10,0); },
+  tick:function(){ tone(1200,.04,"sine",.06,0); },
+  end: function(){ tone(523,.16,"triangle",.14,0); tone(659,.16,"triangle",.14,.13);
+                   tone(784,.28,"triangle",.14,.26); },
+  pb:  function(){ [523,659,784,1046].forEach(function(f,i){ tone(f,.22,"triangle",.15,i*0.09); }); }
+};
+
+/* ============================================================
+   Voice input
+   Chrome and Edge implement this; Firefox does not. A published page also runs
+   inside an embedded frame, so the mic may be refused by the embedding page's
+   permissions rather than by the browser — both cases are reported plainly.
+   ============================================================ */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, recWant = false, recLive = false, recFail = "";
+let recBlocked = false;   /* needs an explicit tap to retry — never auto-hammered */
+let recDry = 0;           /* consecutive sessions that ended having heard nothing */
+let recBackoff = 400;
+let recGot = false;       /* did this session produce any transcript at all */
+let recBenign = false;    /* session ended on ordinary silence, not a fault */
+let recStartedAt = 0;
+const REC_HEALTHY_MS = 1500;  /* a session this long was working, even if silent */
+const REC_GIVE_UP = 4;        /* consecutive *rapid* failures before we stop */
+let micTesting = false;
+const FILE_ORIGIN = (location.protocol === "file:");
+/* Per recognition session: which result slots we've already answered from, and
+   which problem each slot first appeared under. Recognizers emit the same slot
+   repeatedly (interim, then final) and reset slot numbering on every restart,
+   so both maps are cleared whenever a session starts. */
+let recDone = {}, recPid = {};
+function recResetSlots(){ recDone = {}; recPid = {}; }
+
+function voiceSupported(){ return !!SR; }
+
+function voiceReason(){
+  if(!SR) return "This browser can't do speech recognition — Chrome or Edge can.";
+  if(recFail === "not-allowed" || recFail === "service-not-allowed")
+    return "The microphone was blocked. " + (FILE_ORIGIN
+      ? "Opened from a file:// path, Chrome can't remember mic permission and re-asks every time the " +
+        "session restarts. Serve the page over http://localhost, or use the published link, and it sticks."
+      : "Allow mic access for this page, then tap the mic pill to retry.");
+  if(recFail === "audio-capture") return "No microphone was found.";
+  if(recFail === "network") return "Speech recognition couldn't reach its network service.";
+  if(recFail === "paused")
+    return "Recognition stops after a pause in talking, and restarting it on this address " +
+           "re-asks for the microphone — so it waits for you to tap rather than interrupting " +
+           "mid-round. Serving the page over http://localhost, or using the published link, " +
+           "removes the prompt entirely and keeps voice running unattended.";
+  if(recFail === "dropping")
+    return "The mic session kept restarting without hearing anything, so it stopped trying. " +
+           "Tap the mic pill to retry." + (FILE_ORIGIN
+      ? " On a file:// page this is usually the permission prompt reappearing — http://localhost avoids it."
+      : "");
+  if(recFail) return "Speech recognition stopped: " + recFail + ".";
+  return "Say the answer instead of typing — the keypad keeps working either way. The mic is " +
+    "switched on before the clock starts and held for the whole round, so nothing interrupts you " +
+    "mid-game." + (FILE_ORIGIN
+    ? " Heads up: on a file:// page Chrome re-asks for the mic every restart — use http://localhost " +
+      "or the published link for a clean run."
+    : "");
+}
+
+function voiceInit(){
+  if(!SR || rec) return;
+  rec = new SR();
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.lang = "en-US";
+  rec.onstart = function(){
+    recLive = true; recFail = ""; recBlocked = false; recGot = false; recBenign = false;
+    recStartedAt = Date.now();
+    recResetSlots();
+    updateMic();
+  };
+  rec.onerror = function(e){
+    const code = (e && e.error) || "error";
+    /* Normal punctuation of a continuous session — onend handles the restart. */
+    if(code === "no-speech" || code === "aborted"){ recBenign = true; return; }
+    recFail = code;
+    /* A denied or missing mic must never be retried on a timer: that's what
+       produced the repeating permission prompt. Wait for a deliberate tap.
+       The player's own voice preference is left intact either way. */
+    if(code === "not-allowed" || code === "service-not-allowed" || code === "audio-capture")
+      recBlocked = true;
+    updateMic();
+    syncSetup();
+  };
+  rec.onend = function(){
+    recLive = false;
+    /* A session that ran a while, heard something, or ended on plain silence was
+       working. Only sessions that die almost immediately count as failures —
+       otherwise playing on the keypad with voice on would look like a broken mic
+       and switch itself off. */
+    const lasted = Date.now() - recStartedAt;
+    const healthy = recGot || recBenign || lasted >= REC_HEALTHY_MS;
+    if(healthy){ recDry = 0; recBackoff = 400; } else { recDry++; }
+    recGot = false; recBenign = false;
+    updateMic();
+    if(!recWant || recBlocked) return;
+    /* Where the grant isn't kept, an automatic restart means an unbidden
+       permission dialog in the middle of a timed round. Don't. Park it on the
+       pill so the interruption happens when the player chooses it. */
+    if(micEphemeral){
+      recBlocked = true; recFail = "paused";
+      updateMic();
+      return;
+    }
+    /* Give up rather than hammer, and say so where it can be acted on. */
+    if(recDry >= REC_GIVE_UP){
+      recBlocked = true; recFail = "dropping";
+      updateMic(); syncSetup();
+      return;
+    }
+    const wait = recDry > 1 ? recBackoff : 350;
+    if(recDry > 1) recBackoff = Math.min(recBackoff * 2, 5000);
+    setTimeout(function attempt(){
+      if(!recWant || recBlocked) return;
+      /* Don't cycle the mic mid-feedback; it only adds churn (and prompts). */
+      if(run && !run.over && (run.locked || run.paused)){ setTimeout(attempt, 250); return; }
+      voiceStart();
+    }, wait);
+  };
+  rec.onresult = onVoiceResult;
+}
+
+function voiceStart(){
+  if(!SR) return;
+  voiceInit();
+  recWant = true;
+  recGot = false;
+  recResetSlots();
+  try{ rec.start(); }
+  catch(e){ /* already running */ }
+  updateMic();
+}
+function voiceStop(){
+  recWant = false;
+  try{ if(rec) rec.abort(); }catch(e){}
+  recLive = false; recGot = false;
+  updateMic();
+}
+/* ---- holding the microphone ----
+   Every recognition restart re-acquires the capture device, and on origins that
+   can't persist the grant (a file:// page) that means another permission gate
+   mid-round. Holding one open stream for the whole round keeps both the grant and
+   the device alive, so restarts are silent. It is acquired before the clock
+   starts and released when the round ends. */
+let micStream = null;
+
+function holdMic(done){
+  if(micStream && micStream.active){ done(true); return; }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    done(true);   /* can't pre-flight here; let recognition try on its own */
+    return;
+  }
+  let settled = false;
+  const finish = function(ok){ if(settled) return; settled = true; done(ok); };
+  /* Never hang the round on a prompt nobody answers. */
+  const guard = setTimeout(function(){ finish(true); }, 20000);
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(s){
+    clearTimeout(guard);
+    micStream = s;
+    finish(true);
+  }).catch(function(err){
+    clearTimeout(guard);
+    const name = (err && err.name) || "";
+    recFail = (name === "NotAllowedError" || name === "SecurityError") ? "not-allowed"
+            : (name === "NotFoundError" || name === "OverconstrainedError") ? "audio-capture"
+            : "network";
+    recBlocked = true;
+    updateMic(); syncSetup();
+    finish(false);
+  });
+}
+function releaseMic(){
+  if(!micStream) return;
+  try{ micStream.getTracks().forEach(function(t){ t.stop(); }); }catch(e){}
+  micStream = null;
+}
+
+/* ---- can this origin remember the grant? ----
+   Chrome's speech recognition asks for the mic on its own, per start(), and does
+   not ride on a held MediaStream. Where the grant is stored, that ask is silent;
+   where it isn't (a file:// page, most obviously), every restart re-prompts and
+   nothing in this page can prevent it. What it CAN do is detect the situation and
+   say so, instead of letting it look like a bug in the game. */
+let micEphemeral = false;
+
+function permissionState(cb){
+  if(!navigator.permissions || !navigator.permissions.query){ cb(null); return; }
+  try{
+    navigator.permissions.query({name:"microphone"}).then(function(st){
+      cb(st && st.state);
+    }).catch(function(){ cb(null); });
+  }catch(e){ cb(null); }
+}
+
+/* Called right after a successful acquisition: if the browser still reports
+   "prompt" when we demonstrably just had the mic, the grant is not being kept. */
+function checkPersistence(){
+  permissionState(function(st){
+    micEphemeral = (st === "prompt") || (st === null && FILE_ORIGIN);
+    updateMicNotice();
+    syncSetup();
+  });
+}
+
+function updateMicNotice(){
+  const el = $("micNotice");
+  if(!el) return;
+  const show = micEphemeral && cfg.voice && voiceSupported();
+  el.hidden = !show;
+  if(!show) return;
+  el.innerHTML = "<b>This address can't remember microphone permission" +
+    (FILE_ORIGIN ? " (a <code>file://</code> page never can)" : "") + ".</b> " +
+    "Speech recognition asks the browser for the mic each time it restarts after a pause, " +
+    "so it will interrupt again mid-round. Nothing in the page can stop that — " +
+    "open it over <code>http://localhost</code> or the published link and the prompt " +
+    "goes away for good.";
+}
+
+/* Explicit, user-driven recovery — the only thing that clears a blocked mic. */
+function voiceRetry(){
+  recFail = ""; recBlocked = false; recDry = 0; recBackoff = 400;
+  updateMic();
+  holdMic(function(ok){
+    if(ok) voiceStart();
+    updateMic(); syncSetup();
+  });
+}
+
+function updateMic(){
+  const pill = $("hudMic"), label = $("micState");
+  if(!pill) return;
+  pill.hidden = !voiceSupported();
+  const on = recWant && !recBlocked;
+  pill.setAttribute("aria-pressed", on ? "true" : "false");
+  const paused = recBlocked && recFail === "paused";
+  pill.classList.toggle("err", recBlocked && !paused);
+  pill.classList.toggle("warn", paused);
+  label.textContent = paused ? "Voice paused — tap"
+    : recBlocked
+      ? (recFail === "dropping" ? "Mic dropped — tap to retry" : "Mic blocked — tap to retry")
+      : on ? (recLive ? "Listening" : "Starting…") : "Mic off — tap";
+  pill.title = recBlocked ? voiceReason() : "";
+}
+
+function setHeard(text, n){
+  const el = $("heard");
+  if(!el) return;
+  if(!text){ el.innerHTML = ""; return; }
+  el.innerHTML = "heard “" + esc(text.trim()) + "”" +
+    (n === null ? " — no number in that" : " → <b>" + n + "</b>");
+}
+
+function onVoiceResult(e){
+  /* Proof the pipeline works: clear the failure counters. */
+  recGot = true; recDry = 0; recBackoff = 400;
+  if(micTesting){
+    for(let i = e.resultIndex; i < e.results.length; i++){
+      const t = e.results[i][0].transcript, v = parseSpoken(t);
+      $("micTestOut").innerHTML = "Heard “" + esc(t.trim()) + "”" +
+        (v === null ? " — no number in that." : " → <b>" + v + "</b>. Working.");
+      if(e.results[i].isFinal){ micTesting = false; voiceStop(); $("btnMicTest").textContent = "Test microphone"; }
+    }
+    return;
+  }
+  if(!run || run.over) return;
+  const pid = run.pid;
+  for(let i = e.resultIndex; i < e.results.length; i++){
+    /* Already answered from this slot — the interim we acted on is now arriving
+       as a final. Ignore it; scoring it again would hit the next problem. */
+    if(recDone[i]) continue;
+    if(recPid[i] === undefined) recPid[i] = pid;
+    /* Spoken while a different problem was on screen: discard it rather than
+       let it answer whatever is showing now. */
+    if(recPid[i] !== pid){ recDone[i] = true; continue; }
+    if(run.paused || run.locked) continue;
+
+    const r = e.results[i];
+    const txt = r[0].transcript;
+    const n = parseSpoken(txt);
+    setHeard(txt, n);
+    if(n === null) continue;
+    /* A correct answer goes through the moment it's heard; anything else waits for
+       the final transcript, so a half-heard number doesn't cost a life. */
+    if(n === run.problem.answer || r.isFinal){
+      recDone[i] = true;
+      typed = String(n);
+      submit(false, "voice");
+      return;
+    }
+  }
+}
+
+/* ============================================================
+   Players
+   ============================================================ */
+function newPlayer(name){
+  const id = "p"+Date.now()+Math.floor(Math.random()*99);
+  DB.players[id] = {id:id, name:name, facts:{}, runs:[], best:{}};
+  DB.last = id; saveDB(); return DB.players[id];
+}
+function renderPlayers(){
+  const box = $("playerList"); box.innerHTML = "";
+  const ids = Object.keys(DB.players);
+  if(!ids.length){
+    const chip = document.createElement("div");
+    chip.className = "player-chip";
+    chip.innerHTML = '<span>Guest</span><button class="go" data-new="Guest" aria-label="Play as Guest">▶</button>';
+    box.appendChild(chip);
+  }
+  ids.forEach(function(id){
+    const p = DB.players[id];
+    const runs = p.runs ? p.runs.length : 0;
+    const chip = document.createElement("div");
+    chip.className = "player-chip";
+    chip.innerHTML =
+      '<span>'+esc(p.name)+'</span>'+
+      '<small style="color:var(--muted);font-weight:500;font-size:.78rem">'+runs+(runs===1?" round":" rounds")+'</small>'+
+      '<button class="del" data-del="'+id+'" aria-label="Remove '+esc(p.name)+'">✕</button>'+
+      '<button class="go" data-pick="'+id+'" aria-label="Play as '+esc(p.name)+'">▶</button>';
+    box.appendChild(chip);
+  });
+}
+function choosePlayer(p){
+  player = p; DB.last = p.id; saveDB();
+  /* Celebration settings belong to the player, so a new one starts fresh
+     instead of inheriting whatever the last kid picked. */
+  cfg.sparkStyle = (p.fx && FX[p.fx.style]) ? p.fx.style : "confetti";
+  cfg.sparkAmount = (p.fx && AMOUNT[p.fx.amount]) ? p.fx.amount : "normal";
+  cfg.diff = DIFF[p.diff] ? p.diff : 3;
+  cfg.adaptive = ADAPT[p.adaptive] ? p.adaptive : "balanced";
+  cfg.voice = !!p.voice && voiceSupported();
+  $("diffSlider").value = cfg.diff;
+  syncFx();
+  syncSetup();
+  $("setupTitle").textContent = p.name + ", pick your practice";
+  showBest();
+  show("s-setup");
+}
+
+function bestKey(mode, d){ return mode + ":" + d; }
+function showBest(){
+  const b = (player && player.best) || {};
+  const v = b[bestKey(cfg.mode, cfg.diff)];
+  $("setupBest").textContent = v
+    ? "Best " + cfg.mode + " on " + diff().name + ": " + v
+    : "";
+}
+
+/* ============================================================
+   Setup UI
+   ============================================================ */
+function buildSetup(){
+  const opBox = $("opChips"); opBox.innerHTML = "";
+  OP_ORDER.forEach(function(k){
+    const b = document.createElement("button");
+    b.className = "chip op"; b.dataset.op = k;
+    b.style.setProperty("--c", OPS[k].color);
+    b.setAttribute("aria-pressed", cfg.ops.indexOf(k)>=0 ? "true":"false");
+    b.innerHTML = '<span class="sym">'+OPS[k].sym+'</span>'+OPS[k].name;
+    opBox.appendChild(b);
+  });
+
+  const ranges = [["0-5","0 to 5","Starter"],["0-10","0 to 10","Classic"],
+                  ["0-12","0 to 12","Full set"],["custom","Custom",""]];
+  const rBox = $("rangeChips"); rBox.innerHTML = "";
+  ranges.forEach(function(r){
+    const b = document.createElement("button");
+    b.className = "chip"; b.dataset.range = r[0];
+    b.setAttribute("aria-pressed", cfg.rangePreset===r[0] ? "true":"false");
+    b.innerHTML = '<span class="dot" style="--c:var(--ink)"></span>'+r[1]+
+      (r[2] ? ' <small style="color:var(--muted);font-weight:500">'+r[2]+'</small>' : "");
+    rBox.appendChild(b);
+  });
+  ["rangeMin","rangeMax"].forEach(function(id){
+    const s = $(id); s.innerHTML = "";
+    for(let i=0;i<=12;i++){
+      const o = document.createElement("option"); o.value = i; o.textContent = i; s.appendChild(o);
+    }
+  });
+  $("rangeMin").value = cfg.min; $("rangeMax").value = cfg.max;
+
+  const sBox = $("secChips"); sBox.innerHTML = "";
+  [[60,"60 seconds"],[90,"90 seconds"],[120,"2 minutes"]].forEach(function(s){
+    const b = document.createElement("button");
+    b.className = "chip"; b.dataset.sec = s[0];
+    b.setAttribute("aria-pressed", cfg.seconds===s[0] ? "true":"false");
+    b.innerHTML = '<span class="dot" style="--c:var(--ink)"></span>'+s[1];
+    sBox.appendChild(b);
+  });
+  const adBox = $("adaptChips"); adBox.innerHTML = "";
+  ADAPT_ORDER.forEach(function(k){
+    const b = document.createElement("button");
+    b.className = "chip"; b.dataset.adapt = k;
+    b.style.setProperty("--c", "var(--ink)");
+    b.innerHTML = '<span class="dot"></span>'+ADAPT[k].name;
+    adBox.appendChild(b);
+  });
+  $("diffSlider").value = cfg.diff;
+
+  const fxBox = $("fxStyleChips"); fxBox.innerHTML = "";
+  FX_ORDER.forEach(function(k){
+    const b = document.createElement("button");
+    b.className = "chip"; b.dataset.fx = k;
+    b.style.setProperty("--c", FX[k].colors[0]);
+    b.innerHTML = '<span class="dot"></span>'+FX[k].name;
+    fxBox.appendChild(b);
+  });
+  const amBox = $("fxAmountChips"); amBox.innerHTML = "";
+  AMOUNT_ORDER.forEach(function(k){
+    const b = document.createElement("button");
+    b.className = "chip"; b.dataset.amt = k;
+    b.style.setProperty("--c", "var(--ink)");
+    b.innerHTML = '<span class="dot"></span>'+AMOUNT[k].name;
+    amBox.appendChild(b);
+  });
+  syncFx();
+  syncSetup();
+}
+
+function syncFx(){
+  const s = $("fxStyleChips").children, a = $("fxAmountChips").children;
+  for(let i=0;i<s.length;i++)
+    s[i].setAttribute("aria-pressed", s[i].dataset.fx === cfg.sparkStyle ? "true":"false");
+  for(let i=0;i<a.length;i++)
+    a[i].setAttribute("aria-pressed", a[i].dataset.amt === cfg.sparkAmount ? "true":"false");
+  applyFxClass();
+  const off = !fxMult();
+  $("fxPreviewNote").textContent = off
+    ? "No sparkles — streaks still light up the border"
+    : (reduce ? "Motion is reduced in your settings, so these stay still"
+              : "Tap a style to see it");
+  const prev = $("fxPreview");
+  for(let i=prev.children.length-1; i>=0; i--){
+    if(prev.children[i].tagName === "B") prev.children[i].remove();
+  }
+  if(!off && !reduce) fxSpawn(prev, 7, false);
+}
+
+/* Difficulty, adaptive strength and celebration all belong to the player. */
+function savePrefs(){
+  if(!player) return;
+  player.fx = {style:cfg.sparkStyle, amount:cfg.sparkAmount};
+  player.diff = cfg.diff;
+  player.adaptive = cfg.adaptive;
+  player.voice = cfg.voice;
+  saveDB();
+}
+
+function syncSetup(){
+  $("rangeCustom").hidden = cfg.rangePreset !== "custom";
+  $("secondsField").hidden = cfg.mode !== "sprint";
+  const cards = $("modeCards").children;
+  for(let i=0;i<cards.length;i++)
+    cards[i].setAttribute("aria-pressed", cards[i].dataset.mode===cfg.mode ? "true":"false");
+  $("tgAuto").setAttribute("aria-pressed", cfg.autoAdvance ? "true":"false");
+
+  const canVoice = voiceSupported();
+  if(!canVoice) cfg.voice = false;
+  $("tgVoice").setAttribute("aria-pressed", cfg.voice ? "true":"false");
+  $("tgVoice").disabled = !canVoice;
+  $("tgVoice").style.opacity = canVoice ? "" : ".55";
+  $("voiceNote").textContent = voiceReason();
+  $("btnMicTest").disabled = !canVoice;
+
+  const d = diff();
+  $("diffName").textContent = d.name;
+  $("diffNote").textContent = cfg.mode === "survival"
+    ? "Survival starts at " + (d.start/1000).toFixed(1) + "s a problem and eases down to a " +
+      (d.floor/1000).toFixed(1) + "s floor, with " + d.lives + " lives. A missed answer stays " +
+      "on screen " + (d.showMiss/1000).toFixed(1) + "s. Points ×" + d.mult.toFixed(2) + "."
+    : "A missed answer stays on screen " + (d.showMiss/1000).toFixed(1) + "s and points score ×" +
+      d.mult.toFixed(2) + ". Difficulty also sets survival's pacing — " +
+      (d.start/1000).toFixed(1) + "s down to " + (d.floor/1000).toFixed(1) + "s. " +
+      "It never changes which facts you practise.";
+
+  const ad = adapt(), chips = $("adaptChips").children;
+  for(let i=0;i<chips.length;i++)
+    chips[i].setAttribute("aria-pressed", chips[i].dataset.adapt===cfg.adaptive ? "true":"false");
+  $("adaptNote").textContent = ad.rate === 0
+    ? "Every problem is dealt off a freshly shuffled deck of all the facts in range — pure " +
+      "random, nothing repeats until the deck runs out."
+    : "About " + Math.round(ad.rate*100) + "% of problems steer toward facts and fact families " +
+      "you miss or answer slowly; the other " + Math.round((1-ad.rate)*100) + "% come off a " +
+      "shuffled deck of every fact in range.";
+
+  $("btnStart").disabled = cfg.ops.length === 0;
+  $("btnStart").textContent = cfg.ops.length === 0 ? "Pick at least one operation"
+    : (cfg.mode==="sprint" ? "Start "+cfg.seconds+"-second sprint" : "Start survival round");
+  showBest();
+}
+
+/* ============================================================
+   Problem generation
+   ============================================================ */
+function factStats(key){ return (player && player.facts && player.facts[key]) || null; }
+
+/* Typed times are the clean speed measure; fall back to spoken ones so a
+   voice-only player still gets a grid, flagged as such. */
+function factTimes(s){
+  if(!s) return [];
+  if(s.times && s.times.length) return s.times;
+  return s.vtimes || [];
+}
+function isVoiceOnly(s){
+  return !!(s && (!s.times || !s.times.length) && s.vtimes && s.vtimes.length);
+}
+
+function troubleList(op, limit){
+  if(!player || !player.facts) return [];
+  const out = [];
+  for(const k in player.facts){
+    if(op && k.indexOf(op+"|") !== 0) continue;
+    const s = player.facts[k];
+    if(!s || !s.n) continue;
+    const acc = s.ok / s.n;
+    const med = median(factTimes(s));
+    if(acc >= 1 && med && med < FLUENT_MS) continue;
+    const score = (1-acc)*140 + (med ? Math.min(med, 12000)/1000 : 4);
+    out.push([k, score, s, med, acc]);
+  }
+  out.sort(function(a,b){ return b[1]-a[1]; });
+  return limit ? out.slice(0, limit) : out;
+}
+
+/* ---- fact families: a fact belongs to the family of each of its operands,
+   so 7 x 8 counts toward both the 7s and the 8s ---- */
+const FAM_MIN_TRIES = 6;
+
+function familyStats(op){
+  const out = [];
+  for(let f=0; f<=12; f++) out.push({fam:f, n:0, ok:0, times:[]});
+  if(!player || !player.facts) return out;
+  for(const k in player.facts){
+    const p = k.split("|");
+    if(p[0] !== op) continue;
+    const s = player.facts[k], a = +p[1], b = +p[2];
+    const fams = (a === b) ? [a] : [a, b];
+    fams.forEach(function(f){
+      if(f < 0 || f > 12) return;
+      const e = out[f];
+      e.n += s.n; e.ok += s.ok;
+      const t = factTimes(s);
+      if(t.length) e.times = e.times.concat(t);
+    });
+  }
+  return out;
+}
+function familyScore(e){
+  if(e.n < FAM_MIN_TRIES) return null;
+  const acc = e.ok/e.n, med = median(e.times);
+  return {acc:acc, med:med, score:(1-acc)*140 + Math.min(med, 12000)/1000};
+}
+function weakFamilies(op, limit){
+  const list = [];
+  familyStats(op).forEach(function(e){
+    const s = familyScore(e);
+    if(!s) return;
+    if(s.acc >= 1 && s.med && s.med < FLUENT_MS) return;
+    list.push({op:op, fam:e.fam, n:e.n, ok:e.ok, acc:s.acc, med:s.med, score:s.score});
+  });
+  list.sort(function(a,b){ return b.score - a.score; });
+  return limit ? list.slice(0, limit) : list;
+}
+function allWeakFamilies(limit){
+  let all = [];
+  OP_ORDER.forEach(function(op){ all = all.concat(weakFamilies(op)); });
+  all.sort(function(a,b){ return b.score - a.score; });
+  return limit ? all.slice(0, limit) : all;
+}
+function famFact(op, fam, lo, hi){
+  let other = rnd(lo, hi), a = fam, b = other;
+  if(Math.random() < 0.5){ a = other; b = fam; }
+  if(op === "div" && b < 1){
+    if(a >= 1){ const t = a; a = b; b = t; } else { b = 1; }
+  }
+  return {op:op, a:a, b:b};
+}
+function famLabel(op, fam){ return "the " + fam + "s in " + OPS[op].name.toLowerCase(); }
+
+/* ---- the deck ----
+   Independent random draws collide far more often than people expect, which is
+   why uniform sampling *feels* repetitive. So the non-adaptive draws come off a
+   shuffled deck of every fact in range and are dealt without replacement: even
+   coverage, no repeat until the deck runs out. */
+function bagSignature(){
+  return cfg.ops.slice().sort().join(",") + "|" + cfg.min + "-" + cfg.max;
+}
+function buildBag(){
+  const list = [];
+  cfg.ops.forEach(function(op){
+    const blo = (op === "div") ? Math.max(1, cfg.min) : cfg.min;
+    const bhi = (op === "div") ? Math.max(1, cfg.max) : cfg.max;
+    for(let a = cfg.min; a <= cfg.max; a++)
+      for(let b = blo; b <= bhi; b++)
+        list.push(op+"|"+a+"|"+b);
+  });
+  for(let i = list.length-1; i > 0; i--){
+    const j = Math.floor(Math.random()*(i+1));
+    const t = list[i]; list[i] = list[j]; list[j] = t;
+  }
+  bag = list; bagKey = bagSignature();
+}
+function drawBag(){
+  if(bagKey !== bagSignature() || !bag.length) buildBag();
+  return bag.length ? bag.pop() : "add|0|0";
+}
+function keyToFact(k){ const p = k.split("|"); return {op:p[0], a:+p[1], b:+p[2]}; }
+
+/* Sample across the whole weak pool in proportion to how weak each entry is,
+   rather than hammering the single worst one. */
+function weightedPick(rows){
+  let total = 0;
+  for(let i=0;i<rows.length;i++) total += Math.max(0.5, rows[i][1]);
+  let r = Math.random()*total;
+  for(let i=0;i<rows.length;i++){
+    r -= Math.max(0.5, rows[i][1]);
+    if(r <= 0) return rows[i][0];
+  }
+  return rows[rows.length-1][0];
+}
+
+function pickFact(){
+  if(cfg.drillFam) return famFact(cfg.drillFam.op, cfg.drillFam.fam, cfg.min, cfg.max);
+  if(cfg.drill && cfg.drill.length)
+    return keyToFact(cfg.drill[Math.floor(Math.random()*cfg.drill.length)]);
+
+  const ad = adapt();
+  if(ad.rate > 0 && Math.random() < ad.rate){
+    const op = cfg.ops[Math.floor(Math.random()*cfg.ops.length)];
+    if(Math.random() < 0.6){
+      const tr = troubleList(op, ad.pool);
+      if(tr.length) return keyToFact(weightedPick(tr.map(function(e){ return [e[0], e[1]]; })));
+    }
+    const wf = weakFamilies(op, 4);
+    if(wf.length){
+      const w = weightedPick(wf.map(function(x){ return [x, x.score]; }));
+      return famFact(op, w.fam, cfg.min, cfg.max);
+    }
+  }
+  return keyToFact(drawBag());
+}
+
+function buildProblem(){
+  const win = (cfg.drill || cfg.drillFam) ? 2 : 6;
+  let f, key, guard = 0;
+  do{
+    f = pickFact();
+    if(f.op === "div" && f.b < 1) f.b = Math.max(1, cfg.min || 1);
+    key = f.op+"|"+f.a+"|"+f.b;
+    guard++;
+  } while(recent.indexOf(key) >= 0 && guard < 14);
+  recent.push(key); if(recent.length > win) recent.shift();
+
+  const a = f.a, b = f.b;
+  if(f.op === "add")  return {op:"add", key:key, left:a,   right:b, answer:a+b};
+  if(f.op === "sub")  return {op:"sub", key:key, left:a+b, right:b, answer:a};
+  if(f.op === "mul")  return {op:"mul", key:key, left:a,   right:b, answer:a*b};
+  return                     {op:"div", key:key, left:a*b, right:b, answer:a};
+}
+
+/* ============================================================
+   Round lifecycle
+   ============================================================ */
+function startRound(){
+  recent = []; typed = "";
+  run = {
+    mode: cfg.mode, seconds: cfg.seconds, ops: cfg.ops.slice(),
+    min: cfg.min, max: cfg.max, drill: cfg.drill ? cfg.drill.slice() : null,
+    drillFam: cfg.drillFam ? {op:cfg.drillFam.op, fam:cfg.drillFam.fam} : null,
+    diff: cfg.diff, adaptive: cfg.adaptive,
+    started: Date.now(), attempts: [], correct: 0, score: 0,
+    streak: 0, bestStreak: 0, lives: diff().lives, maxLives: diff().lives,
+    pid: 0, over: false, locked: false, paused: false
+  };
+  buildBag();
+  $("hudWho").textContent = player.name;
+  $("hudScore").textContent = "0";
+  $("hudStreak").textContent = "0";
+  $("hudLives").hidden = cfg.mode !== "survival";
+  $("hudClock").hidden = false;
+  const canTalk = cfg.voice && voiceSupported() && !recBlocked;
+  $("playHint").textContent = (canTalk ? "Say it or type it" : "Type the answer") +
+    (cfg.autoAdvance ? " — it sends itself the moment it's right." : ", then press Enter.");
+  const rod = $("rod"); rod.innerHTML = "";
+  for(let i=0;i<20;i++) rod.appendChild(document.createElement("i"));
+  for(let i=0;i<rod.children.length;i++) rod.children[i].classList.add("lit");
+  stopFX();
+  applyFxClass();
+  drawLives();
+  show("s-play");
+
+  /* Nothing is timed until the mic is actually in hand. Input stays locked and
+     no clock exists yet, so a permission prompt can't eat into the round. */
+  run.armed = false;
+  run.locked = true;
+  $("hudClock").hidden = false;
+  $("hudClock").textContent = run.mode === "sprint" ? run.seconds.toFixed(1)+"s" : "—";
+
+  if(!canTalk){
+    voiceStop(); releaseMic(); updateMicNotice();
+    launchRound();
+    return;
+  }
+  showArming("Getting the microphone ready…");
+  holdMic(function(ok){
+    if(!run || run.over) return;
+    if(ok){ voiceStart(); checkPersistence(); } else { voiceStop(); }
+    updateMicNotice();
+    launchRound();
+  });
+}
+
+function showArming(msg){
+  $("stage").classList.remove("hit","miss");
+  $("stage").style.setProperty("--op", "var(--muted)");
+  $("opTag").textContent = "Get ready";
+  $("opTag").style.background = "#6E7480";
+  $("equation").innerHTML =
+    '<span style="font-family:var(--f-body);font-size:.3em;font-weight:600;color:var(--muted)">' +
+    esc(msg) + '</span>';
+  $("verdict").textContent = "";
+  setHeard("");
+}
+
+function launchRound(){
+  if(!run || run.over) return;
+  run.armed = true;
+  if(run.mode === "sprint") run.endAt = performance.now() + run.seconds*1000;
+  nextProblem();
+  cancelAnimationFrame(raf);
+  raf = requestAnimationFrame(loop);
+}
+
+function problemLimit(){
+  const d = DIFF[run.diff] || DIFF[3];
+  const ms = d.floor + (d.start - d.floor)*Math.exp(-d.decay*run.correct);
+  return Math.round(ms/10)*10;
+}
+
+function nextProblem(){
+  run.problem = buildProblem();
+  run.pid++;
+  typed = "";
+  setHeard("");
+  const p = run.problem, o = OPS[p.op];
+  $("stage").style.setProperty("--op", o.color);
+  $("opTag").textContent = o.name;
+  $("opTag").style.background = o.color;
+  $("stage").classList.remove("hit","miss");
+  $("verdict").textContent = ""; $("verdict").className = "verdict";
+  drawEquation();
+  if(run.mode === "survival"){
+    run.pLimit = problemLimit();
+    run.pEndAt = performance.now() + run.pLimit;
+  }
+  run.t0 = performance.now();
+  run.locked = false;
+}
+
+function drawEquation(){
+  const p = run.problem;
+  $("equation").innerHTML =
+    '<span>'+p.left+'</span>'+
+    '<span class="o">'+OPS[p.op].sym+'</span>'+
+    '<span>'+p.right+'</span>'+
+    '<span class="eq">=</span>'+
+    '<span class="slot'+(typed?"":" empty")+'">'+(typed || " ")+
+      (run.locked ? "" : '<span class="caret"></span>')+'</span>';
+}
+
+/* ---- streak celebration: escalates at 5 / 10 / 20, all of it in the outer
+   margins of the stage so nothing ever crosses the equation ---- */
+const TIER_WORD = {1:"On fire!", 2:"Blazing!", 3:"Unstoppable!"};
+let sparkTimer = 0;
+
+function streakTier(s){ return s >= 20 ? 3 : s >= 10 ? 2 : s >= 5 ? 1 : 0; }
+
+/* One spawner for both the stage margins and the setup preview. */
+function fxSpawn(box, n, edgesOnly){
+  if(reduce || !box) return;
+  const st = fxStyle();
+  const cap = edgesOnly ? 40 : 26;
+  if(box.children.length > cap) return;
+  for(let i=0;i<(n||1);i++){
+    const b = document.createElement("b");
+    b.style.left = edgesOnly
+      ? (Math.random() < 0.5 ? Math.random()*12 : 88 + Math.random()*11) + "%"
+      : (4 + Math.random()*92) + "%";
+    b.style.top = edgesOnly ? (28 + Math.random()*58) + "%" : (55 + Math.random()*40) + "%";
+    b.style.setProperty("--c", st.colors[Math.floor(Math.random()*st.colors.length)]);
+    b.style.setProperty("--sz", (st.size + Math.round(Math.random()*4 - 2)) + "px");
+    b.style.animationDuration = (1.2 + Math.random()*0.7) + "s";
+    b.style.animationDelay = (Math.random()*0.3) + "s";
+    box.appendChild(b);
+    (function(el){ setTimeout(function(){ el.remove(); }, 2500); })(b);
+  }
+}
+function spawnSpark(n){
+  const m = fxMult();
+  if(!m || !run || run.over || run.paused) return;
+  fxSpawn($("sparkles"), Math.max(1, Math.round((n||1)*m)), true);
+}
+function applyFxClass(){
+  const st = fxStyle();
+  const stage = $("sparkles"), prev = $("fxPreview");
+  if(stage) stage.className = "sparkles " + st.cls;
+  if(prev) prev.className = "fxpreview sparkles " + st.cls;
+}
+
+function updateStreakFX(){
+  const s = run ? run.streak : 0, tier = streakTier(s);
+  const stage = $("stage"), chip = $("hudStreakChip");
+  if(stage.dataset.tier !== String(tier)){
+    stage.dataset.tier = tier;
+    clearInterval(sparkTimer); sparkTimer = 0;
+    const m = fxMult();
+    if(tier >= 2 && m && !reduce){
+      const base = tier >= 3 ? 300 : 620;
+      sparkTimer = setInterval(spawnSpark, Math.max(120, Math.round(base/m)));
+    }
+  }
+  chip.classList.toggle("hot", tier > 0);
+}
+
+function stopFX(){
+  clearInterval(sparkTimer); sparkTimer = 0;
+  const box = $("sparkles"); if(box) box.innerHTML = "";
+  const stage = $("stage"); if(stage) stage.dataset.tier = "0";
+  $("hudStreakChip").classList.remove("hot");
+}
+
+function drawLives(){
+  const box = $("hudLives"); box.innerHTML = "";
+  for(let i=0;i<run.maxLives;i++){
+    const i2 = document.createElement("i");
+    if(i >= run.lives) i2.className = "gone";
+    box.appendChild(i2);
+  }
+}
+
+function typeKey(k){
+  if(!run || run.over || run.locked || run.paused) return;
+  if(k === "back"){ typed = typed.slice(0,-1); drawEquation(); return; }
+  if(k === "enter"){ if(typed !== "") submit(); return; }
+  if(typed.length >= 3) return;
+  if(typed === "0") typed = "";
+  typed += k;
+  drawEquation();
+  if(cfg.autoAdvance && parseInt(typed,10) === run.problem.answer) submit();
+}
+
+function submit(timedOut, via){
+  if(run.locked) return;
+  run.locked = true;
+  const p = run.problem;
+  const ms = performance.now() - run.t0;
+  const given = timedOut ? null : parseInt(typed,10);
+  const ok = !timedOut && given === p.answer;
+  drawEquation();
+
+  run.attempts.push({op:p.op, key:p.key, left:p.left, right:p.right,
+                     answer:p.answer, given:given, ok:ok, ms:ms, timedOut:!!timedOut,
+                     via: via || "keys"});
+
+  if(ok){
+    run.correct++; run.streak++;
+    if(run.streak > run.bestStreak) run.bestStreak = run.streak;
+    const speedBonus = Math.max(0, Math.round(10 - ms/400));
+    const d = DIFF[run.diff] || DIFF[3];
+    run.score += Math.round((10 + speedBonus + Math.min(run.streak, 10)) * d.mult);
+    $("stage").classList.add("hit");
+    const tier = streakTier(run.streak);
+    $("verdict").textContent = tier
+      ? TIER_WORD[tier] + "  " + run.streak + " in a row"
+      : "Yes!";
+    $("verdict").className = "verdict ok";
+    $("live").textContent = "Correct";
+    sfx.ok();
+    if(tier >= 1) spawnSpark(tier >= 3 ? 4 : tier >= 2 ? 3 : 2);
+    if(run.streak % 10 === 0){ spawnSpark(10); sfx.pb(); }
+    if(run.streak % 25 === 0) burst(26);
+    const chip = $("hudStreakChip");
+    chip.classList.remove("bump"); void chip.offsetWidth; chip.classList.add("bump");
+  }else{
+    run.streak = 0;
+    if(run.mode === "survival"){ run.lives--; drawLives(); }
+    $("stage").classList.add("miss");
+    $("verdict").textContent = (timedOut ? "Time! " : "") + p.left+" "+OPS[p.op].sym+" "+p.right+" = "+p.answer;
+    $("verdict").className = "verdict no";
+    $("live").textContent = "Not quite. The answer is "+p.answer;
+    sfx.no();
+  }
+  $("hudScore").textContent = run.score;
+  $("hudStreak").textContent = run.streak;
+  updateStreakFX();
+  drawEquation();
+
+  const dd = DIFF[run.diff] || DIFF[3];
+  const wait = ok ? (reduce ? 60 : 240) : (reduce ? 300 : dd.showMiss);
+  setTimeout(function(){
+    if(!run || run.over) return;
+    if(run.mode === "survival" && run.lives <= 0){ finish(); return; }
+    if(run.mode === "sprint" && performance.now() >= run.endAt){ finish(); return; }
+    nextProblem();
+  }, wait);
+}
+
+function loop(){
+  if(!run || run.over || !run.armed) return;
+  if(!run.paused){
+    const now = performance.now();
+    if(run.mode === "sprint"){
+      const left = Math.max(0, run.endAt - now);
+      $("hudClock").textContent = (left/1000).toFixed(1)+"s";
+      paintRod(left / (run.seconds*1000), left);
+      if(left <= 0 && !run.locked){ finish(); return; }
+    }else{
+      const left = Math.max(0, run.pEndAt - now);
+      $("hudClock").textContent = (left/1000).toFixed(1)+"s";
+      paintRod(left / run.pLimit, left);
+      if(left <= 0 && !run.locked){ submit(true); }
+    }
+  }
+  raf = requestAnimationFrame(loop);
+}
+
+let lastTick = 99;
+function paintRod(frac, msLeft){
+  const rod = $("rod"), lit = Math.ceil(Math.max(0, Math.min(1, frac)) * 20);
+  for(let i=0;i<rod.children.length;i++)
+    rod.children[i].classList.toggle("lit", i < lit);
+  rod.className = "rod" + (frac < 0.16 ? " danger" : frac < 0.34 ? " warn" : "");
+  const s = Math.ceil(msLeft/1000);
+  if(frac < 0.16 && s !== lastTick && s <= 5 && s > 0){ lastTick = s; sfx.tick(); }
+  if(s > 5) lastTick = 99;
+}
+
+function finish(){
+  if(!run || run.over) return;
+  run.over = true;
+  cancelAnimationFrame(raf);
+  voiceStop();
+  releaseMic();
+  stopFX();
+  commitRun();
+  renderResults();
+  show("s-results");
+  sfx.end();
+}
+
+/* ============================================================
+   Persist the round into the player's profile
+   ============================================================ */
+function commitRun(){
+  if(!player.facts) player.facts = {};
+  run.attempts.forEach(function(a){
+    const s = player.facts[a.key] || (player.facts[a.key] = {n:0, ok:0, times:[]});
+    s.n++;
+    if(a.ok){
+      s.ok++;
+      /* Spoken answers carry recognition lag, so they're kept apart from the
+         typed times that drive the speed diagnostics. */
+      if(a.via === "voice"){
+        if(!s.vtimes) s.vtimes = [];
+        s.vtimes.push(Math.round(a.ms));
+        if(s.vtimes.length > 20) s.vtimes.shift();
+      }else{
+        s.times.push(Math.round(a.ms));
+        if(s.times.length > 20) s.times.shift();
+      }
+    }
+  });
+  const summary = {
+    at: run.started, mode: run.mode, seconds: run.seconds, ops: run.ops,
+    min: run.min, max: run.max, drill: !!(run.drill || run.drillFam),
+    d: run.diff, adaptive: run.adaptive,
+    score: run.score, correct: run.correct, total: run.attempts.length,
+    bestStreak: run.bestStreak,
+    median: Math.round(median(run.attempts.filter(function(a){return a.ok;})
+                              .map(function(a){return a.ms;})))
+  };
+  if(!player.runs) player.runs = [];
+  player.runs.push(summary);
+  if(player.runs.length > 60) player.runs.shift();
+
+  if(!player.best) player.best = {};
+  run.isPB = false;
+  /* Personal bests are kept per difficulty, so a Gentle score never beats a Fierce one. */
+  const bk = bestKey(run.mode, run.diff);
+  if(!run.drill && !run.drillFam && (!player.best[bk] || run.score > player.best[bk])){
+    if(player.best[bk]) run.isPB = true;
+    player.best[bk] = run.score;
+  }
+  saveDB();
+}
+
+/* ============================================================
+   Results
+   ============================================================ */
+function rankFor(score){
+  let r = RANK_STEPS[0][1];
+  for(let i=0;i<RANK_STEPS.length;i++) if(score >= RANK_STEPS[i][0]) r = RANK_STEPS[i][1];
+  return r;
+}
+
+function renderResults(){
+  const A = run.attempts;
+  const okA = A.filter(function(a){return a.ok;});
+  const times = okA.map(function(a){return a.ms;});
+  const med = median(times);
+  const acc = A.length ? Math.round(run.correct/A.length*100) : 0;
+
+  $("rRank").textContent = rankFor(run.score);
+  $("rScore").textContent = run.score;
+  $("rSub").textContent = player.name + " · " + run.correct + " of " + A.length + " correct · " +
+    (run.mode === "sprint" ? run.seconds+"-second sprint" : "survival") +
+    " · " + (DIFF[run.diff]||DIFF[3]).name +
+    (run.drillFam ? " · drilling " + famLabel(run.drillFam.op, run.drillFam.fam)
+                  : run.drill ? " · drill round" : "");
+  $("rPB").innerHTML = run.isPB ? '<div class="pb">★ New personal best</div>' : "";
+  if(run.isPB){ burst(60); sfx.pb(); }
+
+  const spoken = A.filter(function(a){ return a.via === "voice"; });
+  const spokenOk = spoken.filter(function(a){ return a.ok; });
+  const typedOk = okA.filter(function(a){ return a.via !== "voice"; });
+  const fastest = typedOk.length ? Math.min.apply(null, typedOk.map(function(a){return a.ms;}))
+                : times.length ? Math.min.apply(null, times) : 0;
+  $("rTiles").innerHTML = [
+    tile("Correct", run.correct, "out of "+A.length+" problems"),
+    tile("Accuracy", acc+"%", acc>=90?"Sharp":acc>=70?"Solid":"Keep going"),
+    tile("Typical answer", med ? secs(med)+"s" : "—", "median of correct answers"),
+    tile("Fastest", fastest ? secs(fastest)+"s" : "—", "single answer"),
+    tile("Best streak", run.bestStreak, "in a row"),
+    spoken.length ? tile("Spoken", spokenOk.length + "/" + spoken.length,
+      (spokenOk.length ? "median " + secs(median(spokenOk.map(function(a){return a.ms;}))) + "s"
+                       : "answered out loud")) : ""
+  ].join("");
+  $("rVoiceNote").innerHTML = spoken.length
+    ? "<b>" + spoken.length + " answer" + (spoken.length===1?"":"s") + " came in by voice.</b> " +
+      "Spoken times include however long recognition took, so they run longer than typed ones " +
+      "and are kept out of the fact grid's speed colours wherever a typed time exists."
+    : "";
+  $("rVoiceNote").hidden = !spoken.length;
+
+  renderFluency(A);
+  $("rTrace").innerHTML = traceSVG(A, med);
+  renderTable(A);
+  renderHeat();
+  renderFamilies();
+  renderTrouble();
+  renderHistory();
+}
+
+function tile(k,v,n){
+  return '<div class="tile"><div class="k">'+esc(k)+'</div><div class="v">'+esc(v)+
+         '</div><div class="n">'+esc(n)+'</div></div>';
+}
+
+function renderFluency(A){
+  let f=0,d=0,s=0,m=0;
+  A.forEach(function(a){
+    if(!a.ok) m++;
+    else if(a.ms < FLUENT_MS) f++;
+    else if(a.ms < DEVELOPING_MS) d++;
+    else s++;
+  });
+  const total = A.length || 1;
+  const parts = [[f,"var(--good)"],[d,"var(--gold)"],[s,"var(--op-mul)"],[m,"var(--bad)"]];
+  $("rFluency").innerHTML = parts.map(function(p){
+    if(!p[0]) return "";
+    return '<div style="flex:'+p[0]+';background:'+p[1]+'">'+
+           (p[0]/total > 0.07 ? p[0] : "")+'</div>';
+  }).join("") || '<div style="flex:1;background:var(--line)"></div>';
+}
+
+function traceSVG(A, med){
+  if(!A.length) return '<p class="empty">No answers recorded.</p>';
+  const W=640, H=200, padL=42, padR=10, padT=14, padB=26;
+  const cap = 10000;
+  const maxMs = Math.max(2000, Math.min(cap, Math.max.apply(null, A.map(function(a){return a.ms;}))));
+  const iw = W-padL-padR, ih = H-padT-padB;
+  const bw = Math.max(2, Math.min(22, iw/A.length - 2));
+  const step = iw/A.length;
+  let bars = "";
+  A.forEach(function(a,i){
+    const v = Math.min(a.ms, maxMs);
+    const h = Math.max(2, v/maxMs*ih);
+    const x = padL + i*step + (step-bw)/2;
+    const col = !a.ok ? "#E5484D" : a.ms<FLUENT_MS ? "#3FA34D" : a.ms<DEVELOPING_MS ? "#F2B705" : "#EC7A28";
+    bars += '<rect x="'+x.toFixed(1)+'" y="'+(padT+ih-h).toFixed(1)+'" width="'+bw.toFixed(1)+
+            '" height="'+h.toFixed(1)+'" rx="2" fill="'+col+'"><title>#'+(i+1)+"  "+
+            a.left+" "+OPS[a.op].sym+" "+a.right+" = "+a.answer+"  ·  "+secs(a.ms)+"s"+
+            (a.ok?"":"  ·  missed")+'</title></rect>';
+  });
+  let grid = "";
+  [0, 0.5, 1].forEach(function(t){
+    const y = padT + ih - t*ih;
+    grid += '<line x1="'+padL+'" y1="'+y.toFixed(1)+'" x2="'+(W-padR)+'" y2="'+y.toFixed(1)+
+            '" stroke="#DDD9CE" stroke-width="1"/>'+
+            '<text x="'+(padL-8)+'" y="'+(y+4).toFixed(1)+'" text-anchor="end" font-size="11" '+
+            'font-family="IBM Plex Mono, monospace" fill="#6E7480">'+(maxMs*t/1000).toFixed(1)+'s</text>';
+  });
+  let medLine = "";
+  if(med){
+    const y = padT + ih - Math.min(med,maxMs)/maxMs*ih;
+    medLine = '<line x1="'+padL+'" y1="'+y.toFixed(1)+'" x2="'+(W-padR)+'" y2="'+y.toFixed(1)+
+      '" stroke="#1A2430" stroke-width="1.5" stroke-dasharray="5 4"/>'+
+      '<text x="'+(W-padR)+'" y="'+(y-6).toFixed(1)+'" text-anchor="end" font-size="11" '+
+      'font-family="IBM Plex Mono, monospace" fill="#1A2430">median '+secs(med)+'s</text>';
+  }
+  return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block" '+
+    'role="img" aria-label="Time taken for each answer in order">'+grid+bars+medLine+
+    '<text x="'+padL+'" y="'+(H-6)+'" font-size="11" font-family="IBM Plex Mono, monospace" '+
+    'fill="#6E7480">problem 1</text>'+
+    '<text x="'+(W-padR)+'" y="'+(H-6)+'" text-anchor="end" font-size="11" '+
+    'font-family="IBM Plex Mono, monospace" fill="#6E7480">problem '+A.length+'</text></svg>';
+}
+
+function renderTable(A){
+  const rows = {};
+  A.forEach(function(a){
+    const r = rows[a.op] || (rows[a.op] = {n:0, ok:0, t:[]});
+    r.n++; if(a.ok){ r.ok++; r.t.push(a.ms); }
+  });
+  let html = '<thead><tr><th>Operation</th><th>Seen</th><th>Correct</th><th>Accuracy</th>'+
+             '<th>Typical</th><th>Fastest</th></tr></thead><tbody>';
+  OP_ORDER.forEach(function(op){
+    const r = rows[op]; if(!r) return;
+    const m = median(r.t), fast = r.t.length ? Math.min.apply(null,r.t) : 0;
+    html += '<tr><td><span class="opname"><i style="background:'+OPS[op].color+'"></i>'+
+      OPS[op].name+'</span></td><td>'+r.n+'</td><td>'+r.ok+'</td><td>'+
+      Math.round(r.ok/r.n*100)+'%</td><td>'+(m?secs(m)+"s":"—")+'</td><td>'+
+      (fast?secs(fast)+"s":"—")+'</td></tr>';
+  });
+  $("rTable").innerHTML = html + "</tbody>";
+}
+
+function heatColor(med, n){
+  if(!n) return "#DDD9CE";
+  if(!med) return "#F0EDE4";
+  if(med < 1500) return "#3FA34D";
+  if(med < 3000) return "#9BC53D";
+  if(med < 6000) return "#F2B705";
+  return "#EC7A28";
+}
+function renderHeat(){
+  const seen = {};
+  run.attempts.forEach(function(a){ seen[a.op] = true; });
+  const ops = OP_ORDER.filter(function(o){ return seen[o]; });
+  if(!ops.length){ $("rHeat").innerHTML = '<p class="empty">Nothing to chart.</p>'; return; }
+  if(ops.indexOf(heatOp) < 0) heatOp = ops[0];
+
+  $("rHeatTabs").innerHTML = ops.map(function(o){
+    return '<button class="tab" data-heat="'+o+'" aria-selected="'+(o===heatOp)+'">'+
+           OPS[o].name+'</button>';
+  }).join("");
+
+  const lo = 0, hi = 12;
+  const g = document.createElement("div");
+  g.className = "heat";
+  g.style.gridTemplateColumns = "repeat("+(hi-lo+2)+", 26px)";
+  const corner = document.createElement("div");
+  corner.className = "hh"; corner.textContent = OPS[heatOp].sym;
+  g.appendChild(corner);
+  for(let b=lo;b<=hi;b++){
+    const h = document.createElement("div"); h.className = "hh"; h.textContent = b; g.appendChild(h);
+  }
+  for(let a=lo;a<=hi;a++){
+    const rh = document.createElement("div"); rh.className = "hh"; rh.textContent = a; g.appendChild(rh);
+    for(let b=lo;b<=hi;b++){
+      const key = heatOp+"|"+a+"|"+b;
+      const s = factStats(key);
+      const c = document.createElement("div");
+      c.className = "hc";
+      const med = s ? median(factTimes(s)) : 0;
+      c.style.background = heatColor(med, s ? s.n : 0);
+      if(s && s.ok < s.n) c.classList.add("miss");
+      const spoken = isVoiceOnly(s);
+      let lbl = "";
+      if(heatOp === "add") lbl = a+" + "+b+" = "+(a+b);
+      else if(heatOp === "sub") lbl = (a+b)+" − "+b+" = "+a;
+      else if(heatOp === "mul") lbl = a+" × "+b+" = "+(a*b);
+      else lbl = (a*b)+" ÷ "+(b||1)+" = "+a;
+      c.title = lbl + (s ? "  ·  "+s.ok+"/"+s.n+" correct"+
+                           (med ? ", typically "+secs(med)+"s"+(spoken?" (spoken)":"") : "")
+                         : "  ·  not tried yet");
+      if(heatOp === "div" && b === 0){ c.style.background = "#F0EDE4"; c.title = "Nothing is divided by zero"; }
+      g.appendChild(c);
+    }
+  }
+  $("rHeat").innerHTML = ""; $("rHeat").appendChild(g);
+  $("rHeatNote").textContent = GRID_NOTE[heatOp];
+}
+
+function famColor(e){
+  const s = familyScore(e);
+  if(!s) return "#DDD9CE";
+  if(s.acc < 0.70) return "#E5484D";
+  if(s.acc < 0.90) return "#EC7A28";
+  if(!s.med) return "#DDD9CE";
+  if(s.med >= DEVELOPING_MS) return "#EC7A28";
+  if(s.med >= FLUENT_MS) return "#F2B705";
+  if(s.med >= 1500) return "#9BC53D";
+  return "#3FA34D";
+}
+
+function renderFamilies(){
+  const withData = OP_ORDER.filter(function(op){
+    return familyStats(op).some(function(e){ return e.n > 0; });
+  });
+  const grid = $("rFamGrid");
+  if(!withData.length){
+    grid.innerHTML = "";
+    $("rFamLead").textContent = "Nothing here yet — families need a few tries each before they mean anything.";
+    $("rFamDrill").innerHTML = "";
+    return;
+  }
+
+  const g = document.createElement("div");
+  g.className = "fam";
+  g.appendChild(document.createElement("div"));
+  for(let f=0; f<=12; f++){
+    const h = document.createElement("div");
+    h.className = "fh"; h.textContent = f; g.appendChild(h);
+  }
+  withData.forEach(function(op){
+    const lab = document.createElement("div");
+    lab.className = "flabel";
+    lab.innerHTML = '<i style="background:'+OPS[op].color+'"></i>'+OPS[op].name;
+    g.appendChild(lab);
+    const stats = familyStats(op);
+    stats.forEach(function(e){
+      const c = document.createElement("div");
+      c.className = "fc";
+      c.style.background = famColor(e);
+      const s = familyScore(e);
+      c.textContent = s ? Math.round(s.acc*100) : "";
+      c.title = "The " + e.fam + "s in " + OPS[op].name.toLowerCase() + " — " +
+        (e.n ? e.ok+"/"+e.n+" correct" + (s && s.med ? ", typically "+secs(s.med)+"s" : "")
+             : "not tried yet") +
+        (e.n && e.n < FAM_MIN_TRIES ? " (needs "+FAM_MIN_TRIES+"+ tries to rate)" : "");
+      g.appendChild(c);
+    });
+  });
+  grid.innerHTML = ""; grid.appendChild(g);
+
+  const weak = allWeakFamilies(3);
+  if(!weak.length){
+    $("rFamLead").innerHTML = "No family is dragging yet. Either everything is landing, or no number " +
+      "has come up " + FAM_MIN_TRIES + " times yet — grey cells are the ones still short on data.";
+    $("rFamDrill").innerHTML = "";
+    return;
+  }
+  const w = weak[0];
+  $("rFamLead").innerHTML =
+    "Biggest sticking point right now: <b>" + famLabel(w.op, w.fam) + "</b> — " +
+    Math.round(w.acc*100) + "% correct" + (w.med ? ", " + secs(w.med) + "s typical" : "") +
+    " across " + w.n + " tries." +
+    (weak.length > 1 ? " Then " + weak.slice(1).map(function(x){
+      return famLabel(x.op, x.fam) + " (" + Math.round(x.acc*100) + "%)";
+    }).join(" and ") + "." : "");
+
+  $("rFamDrill").innerHTML = weak.slice(0,2).map(function(x,i){
+    return '<button class="btn'+(i===0?" drill":" alt")+'" data-fam="'+x.op+':'+x.fam+'">Drill '+
+      famLabel(x.op, x.fam)+'</button>';
+  }).join("");
+}
+
+function renderTrouble(){
+  const list = troubleList(null, 8);
+  const box = $("rTrouble");
+  if(!list.length){
+    box.innerHTML = '<p class="empty">Nothing sticking out yet — every fact you’ve seen came back fast and correct. '+
+      'Play another round or widen the number range to find the edges.</p>';
+    $("rDrillWrap").innerHTML = "";
+    return;
+  }
+  box.innerHTML = list.map(function(e){
+    const p = e[0].split("|"), op = p[0], a = +p[1], b = +p[2];
+    let txt;
+    if(op === "add") txt = a+" + "+b;
+    else if(op === "sub") txt = (a+b)+" − "+b;
+    else if(op === "mul") txt = a+" × "+b;
+    else txt = (a*b)+" ÷ "+b;
+    const med = e[3], acc = e[4], s = e[2];
+    const note = acc < 1 ? s.ok+"/"+s.n+" right" : secs(med)+"s";
+    return '<span class="tf"><i style="width:8px;height:16px;border-radius:2px;display:block;background:'+
+      OPS[op].color+'"></i>'+txt+' <small>'+note+'</small></span>';
+  }).join("");
+  $("rDrillWrap").innerHTML =
+    '<button class="btn drill" id="btnDrill">Drill these '+list.length+' facts</button>';
+  $("btnDrill").addEventListener("click", function(){
+    cfg.drillFam = null;
+    cfg.drill = list.map(function(e){ return e[0]; });
+    startRound();
+  });
+}
+
+function renderHistory(){
+  const runs = (player.runs||[]).filter(function(r){
+    return r.mode === run.mode && !r.drill && (r.d || 3) === run.diff;
+  });
+  const panel = $("rHistoryPanel");
+  $("rHistLabel").textContent = (run.mode === "sprint" ? "Sprint" : "Survival") +
+    " scores on " + (DIFF[run.diff]||DIFF[3]).name;
+  if(runs.length < 2){
+    $("rHistory").innerHTML = '<p class="empty">One round on the board at this difficulty. Play a '+
+      'couple more and this turns into a progress line you can watch climb.</p>';
+    panel.hidden = false; return;
+  }
+  const data = runs.slice(-12);
+  const W=640,H=170,padL=42,padR=14,padT=14,padB=28;
+  const iw=W-padL-padR, ih=H-padT-padB;
+  const max = Math.max.apply(null, data.map(function(d){return d.score;}));
+  const top = Math.max(10, Math.ceil(max/50)*50);
+  const x = function(i){ return padL + (data.length===1 ? iw/2 : i*iw/(data.length-1)); };
+  const y = function(v){ return padT + ih - v/top*ih; };
+  let grid = "";
+  [0,0.5,1].forEach(function(t){
+    const yy = padT+ih-t*ih;
+    grid += '<line x1="'+padL+'" y1="'+yy+'" x2="'+(W-padR)+'" y2="'+yy+
+      '" stroke="#DDD9CE" stroke-width="1"/><text x="'+(padL-8)+'" y="'+(yy+4)+
+      '" text-anchor="end" font-size="11" font-family="IBM Plex Mono, monospace" fill="#6E7480">'+
+      Math.round(top*t)+'</text>';
+  });
+  const pts = data.map(function(d,i){ return x(i).toFixed(1)+","+y(d.score).toFixed(1); }).join(" ");
+  const area = 'M'+x(0).toFixed(1)+','+(padT+ih)+' L'+pts.split(" ").join(" L")+' L'+
+               x(data.length-1).toFixed(1)+','+(padT+ih)+' Z';
+  let dots = "";
+  data.forEach(function(d,i){
+    const last = i === data.length-1;
+    dots += '<circle cx="'+x(i).toFixed(1)+'" cy="'+y(d.score).toFixed(1)+'" r="'+(last?5:3.2)+
+      '" fill="'+(last?"#EC7A28":"#2F6FD0")+'" stroke="#FFFFFF" stroke-width="1.5"><title>'+
+      new Date(d.at).toLocaleDateString()+"  ·  "+d.score+" points, "+d.correct+"/"+d.total+
+      ' correct</title></circle>';
+  });
+  const lastD = data[data.length-1];
+  $("rHistory").innerHTML =
+    '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block" role="img" '+
+    'aria-label="Score across recent rounds">'+grid+
+    '<path d="'+area+'" fill="#2F6FD0" opacity="0.10"/>'+
+    '<polyline points="'+pts+'" fill="none" stroke="#2F6FD0" stroke-width="2.5" '+
+    'stroke-linejoin="round" stroke-linecap="round"/>'+dots+
+    '<text x="'+(W-padR)+'" y="'+(y(lastD.score)-12).toFixed(1)+'" text-anchor="end" font-size="12" '+
+    'font-family="IBM Plex Mono, monospace" font-weight="600" fill="#EC7A28">'+lastD.score+'</text>'+
+    '<text x="'+padL+'" y="'+(H-6)+'" font-size="11" font-family="IBM Plex Mono, monospace" '+
+    'fill="#6E7480">'+data.length+' most recent rounds</text></svg>';
+  panel.hidden = false;
+}
+
+function summaryText(){
+  const A = run.attempts, okA = A.filter(function(a){return a.ok;});
+  const med = median(okA.map(function(a){return a.ms;}));
+  const lines = [
+    "Number Zoomies — " + player.name,
+    new Date(run.started).toLocaleString(),
+    (run.mode === "sprint" ? run.seconds+"-second sprint" : "Survival") +
+      "  ·  " + (DIFF[run.diff]||DIFF[3]).name +
+      "  ·  numbers "+run.min+"–"+run.max +
+      "  ·  " + run.ops.map(function(o){return OPS[o].short;}).join(", "),
+    "",
+    "Score: "+run.score+"   Rank: "+rankFor(run.score),
+    "Correct: "+run.correct+" of "+A.length+" ("+(A.length?Math.round(run.correct/A.length*100):0)+"%)",
+    "Typical answer time: "+(med?secs(med)+"s":"—"),
+    "Best streak: "+run.bestStreak
+  ];
+  const spk = A.filter(function(a){ return a.via === "voice"; });
+  if(spk.length) lines.push("Answered by voice: "+spk.length+" of "+A.length);
+  const wf = allWeakFamilies(3);
+  if(wf.length){
+    lines.push("", "Weakest families: " + wf.map(function(x){
+      return x.fam + "s (" + OPS[x.op].short.toLowerCase() + ", " + Math.round(x.acc*100) + "%)";
+    }).join(", "));
+  }
+  const tl = troubleList(null, 6);
+  if(tl.length){
+    lines.push("", "Work on: " + tl.map(function(e){
+      const p = e[0].split("|"), a=+p[1], b=+p[2];
+      if(p[0]==="add") return a+"+"+b;
+      if(p[0]==="sub") return (a+b)+"-"+b;
+      if(p[0]==="mul") return a+"x"+b;
+      return (a*b)+"/"+b;
+    }).join(", "));
+  }
+  return lines.join("\n");
+}
+
+/* ============================================================
+   Confetti
+   ============================================================ */
+function burst(n){
+  const m = fxMult();
+  if(reduce || !m) return;
+  n = Math.max(6, Math.round(n*m));
+  const colors = fxStyle().colors;
+  const wrap = document.createElement("div");
+  wrap.className = "confetti";
+  for(let i=0;i<n;i++){
+    const p = document.createElement("i");
+    p.style.left = Math.random()*100+"%";
+    p.style.background = colors[i%colors.length];
+    p.style.animationDuration = (1.5+Math.random()*1.1)+"s";
+    p.style.animationDelay = (Math.random()*0.35)+"s";
+    p.style.setProperty("--spin", (Math.random()*900-450)+"deg");
+    wrap.appendChild(p);
+  }
+  document.body.appendChild(wrap);
+  setTimeout(function(){ wrap.remove(); }, 3200);
+}
+
+/* ============================================================
+   Backup: move players between devices
+   Profiles live in this browser only, so a new device or a new web
+   address starts empty. A backup is plain JSON: a file, or text to paste.
+   ============================================================ */
+const BACKUP_KIND = "number-zoomies-backup";
+
+function backupText(){
+  return JSON.stringify({kind:BACKUP_KIND, version:1, saved:new Date().toISOString(),
+                         players:DB.players}, null, 0);
+}
+function backupMsg(txt, bad){
+  const el = $("backupMsg");
+  el.textContent = txt;
+  el.style.color = bad ? "var(--bad)" : "";
+}
+
+function mergeFacts(a, b){
+  const out = {};
+  [a || {}, b || {}].forEach(function(src){
+    for(const k in src){
+      const s = src[k]; if(!s) continue;
+      const t = out[k] || (out[k] = {n:0, ok:0, times:[]});
+      t.n += s.n || 0; t.ok += s.ok || 0;
+      t.times = t.times.concat(s.times || []).slice(-20);
+      if(s.vtimes && s.vtimes.length) t.vtimes = (t.vtimes || []).concat(s.vtimes).slice(-20);
+    }
+  });
+  return out;
+}
+
+/* Two copies of one player: if they share rounds, one is a copy of the other,
+   so keep the longer history whole. If they share none, they were played
+   separately, so add them together. */
+function mergePlayer(cur, inc){
+  const curRuns = cur.runs || [], incRuns = inc.runs || [];
+  const seen = {};
+  curRuns.forEach(function(r){ seen[r.at] = true; });
+  const shared = incRuns.some(function(r){ return seen[r.at]; });
+  let facts;
+  if(shared) facts = (incRuns.length > curRuns.length ? inc.facts : cur.facts) || {};
+  else facts = mergeFacts(cur.facts, inc.facts);
+  const runs = curRuns.concat(incRuns.filter(function(r){ return !seen[r.at]; }))
+    .sort(function(x,y){ return x.at - y.at; }).slice(-60);
+  const best = Object.assign({}, cur.best || {});
+  const ib = inc.best || {};
+  for(const k in ib) if(!best[k] || ib[k] > best[k]) best[k] = ib[k];
+  return Object.assign({}, cur, {
+    facts:facts, runs:runs, best:best,
+    fx: inc.fx || cur.fx, diff: inc.diff || cur.diff,
+    adaptive: inc.adaptive || cur.adaptive, voice: !!(inc.voice || cur.voice)
+  });
+}
+
+function importBackup(raw){
+  let data;
+  try{ data = JSON.parse(String(raw || "").trim()); }
+  catch(e){ backupMsg("That doesn't look like a Number Zoomies backup.", true); return; }
+  const players = data && (data.kind === BACKUP_KIND ? data.players : data.players);
+  if(!players || typeof players !== "object"){
+    backupMsg("That doesn't look like a Number Zoomies backup.", true); return;
+  }
+  let added = 0, updated = 0;
+  for(const id in players){
+    const inc = players[id];
+    if(!inc || typeof inc.name !== "string" || !inc.name.trim()) continue;
+    const name = inc.name.trim().slice(0,14);
+    let matchId = DB.players[id] ? id : null;
+    if(!matchId){
+      for(const k in DB.players){
+        if(DB.players[k].name.toLowerCase() === name.toLowerCase()){ matchId = k; break; }
+      }
+    }
+    const clean = {id:id, name:name, facts:inc.facts || {}, runs:Array.isArray(inc.runs) ? inc.runs : [],
+                   best:inc.best || {}, fx:inc.fx, diff:inc.diff, adaptive:inc.adaptive, voice:inc.voice};
+    if(matchId){
+      DB.players[matchId] = mergePlayer(DB.players[matchId], clean);
+      DB.players[matchId].id = matchId;
+      updated++;
+    }else{
+      DB.players[id] = clean;
+      added++;
+    }
+  }
+  if(!added && !updated){ backupMsg("No players found in that backup.", true); return; }
+  saveDB();
+  renderPlayers();
+  backupMsg("Loaded: " + added + " new player" + (added===1?"":"s") + ", " +
+            updated + " updated.");
+}
+
+$("btnExportFile").addEventListener("click", function(){
+  if(!Object.keys(DB.players).length){ backupMsg("No players to save yet.", true); return; }
+  try{
+    const blob = new Blob([backupText()], {type:"application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "number-zoomies-backup-" + new Date().toISOString().slice(0,10) + ".json";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+    backupMsg("Saved. Look for it in Downloads.");
+  }catch(e){
+    backupMsg("This browser wouldn't save a file here. Use Copy backup as text instead.", true);
+  }
+});
+$("btnImportFile").addEventListener("click", function(){ $("importFile").click(); });
+$("importFile").addEventListener("change", function(){
+  const f = this.files && this.files[0];
+  if(!f) return;
+  const r = new FileReader();
+  r.onload = function(){ importBackup(r.result); };
+  r.onerror = function(){ backupMsg("Couldn't read that file.", true); };
+  r.readAsText(f);
+  this.value = "";
+});
+$("btnExportCopy").addEventListener("click", function(){
+  if(!Object.keys(DB.players).length){ backupMsg("No players to copy yet.", true); return; }
+  const txt = backupText();
+  function ok(){ backupMsg("Copied. Paste it into the other device's backup box."); }
+  function fallback(){
+    const ta = $("importText");
+    ta.value = txt; ta.focus(); ta.select();
+    let done = false;
+    try{ done = document.execCommand("copy"); }catch(e){}
+    if(done) ok(); else backupMsg("Couldn't copy automatically — the text is in the box below; copy it by hand.", true);
+  }
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(ok, fallback);
+    else fallback();
+  }catch(e){ fallback(); }
+});
+$("btnImportPaste").addEventListener("click", function(){
+  const v = $("importText").value;
+  if(!v.trim()){ backupMsg("Paste the backup text into the box first.", true); return; }
+  importBackup(v);
+  $("importText").value = "";
+});
+
+/* ============================================================
+   Events
+   ============================================================ */
+$("playerList").addEventListener("click", function(e){
+  const nw = e.target.closest("[data-new]");
+  if(nw){ choosePlayer(newPlayer(nw.dataset.new)); renderPlayers(); return; }
+  const pick = e.target.closest("[data-pick]");
+  if(pick){ choosePlayer(DB.players[pick.dataset.pick]); return; }
+  const del = e.target.closest("[data-del]");
+  if(del){
+    const p = DB.players[del.dataset.del];
+    if(p && window.confirm("Remove "+p.name+" and their saved stats?")){
+      delete DB.players[del.dataset.del]; saveDB(); renderPlayers();
+    }
+  }
+});
+$("newPlayerForm").addEventListener("submit", function(e){
+  e.preventDefault();
+  const v = $("newPlayerName").value.trim();
+  if(!v) return;
+  $("newPlayerName").value = "";
+  choosePlayer(newPlayer(v));
+  renderPlayers();
+});
+
+$("opChips").addEventListener("click", function(e){
+  const b = e.target.closest("[data-op]"); if(!b) return;
+  const k = b.dataset.op, i = cfg.ops.indexOf(k);
+  if(i >= 0) cfg.ops.splice(i,1); else cfg.ops.push(k);
+  b.setAttribute("aria-pressed", i>=0 ? "false":"true");
+  syncSetup();
+});
+$("rangeChips").addEventListener("click", function(e){
+  const b = e.target.closest("[data-range]"); if(!b) return;
+  cfg.rangePreset = b.dataset.range;
+  if(cfg.rangePreset !== "custom"){
+    const p = cfg.rangePreset.split("-"); cfg.min = +p[0]; cfg.max = +p[1];
+    $("rangeMin").value = cfg.min; $("rangeMax").value = cfg.max;
+  }
+  const kids = $("rangeChips").children;
+  for(let i=0;i<kids.length;i++)
+    kids[i].setAttribute("aria-pressed", kids[i].dataset.range===cfg.rangePreset ? "true":"false");
+  syncSetup();
+});
+$("rangeMin").addEventListener("change", function(){
+  cfg.min = +this.value;
+  if(cfg.min > cfg.max){ cfg.max = cfg.min; $("rangeMax").value = cfg.max; }
+});
+$("rangeMax").addEventListener("change", function(){
+  cfg.max = +this.value;
+  if(cfg.max < cfg.min){ cfg.min = cfg.max; $("rangeMin").value = cfg.min; }
+});
+$("modeCards").addEventListener("click", function(e){
+  const b = e.target.closest("[data-mode]"); if(!b) return;
+  cfg.mode = b.dataset.mode; syncSetup();
+});
+$("secChips").addEventListener("click", function(e){
+  const b = e.target.closest("[data-sec]"); if(!b) return;
+  cfg.seconds = +b.dataset.sec;
+  const kids = $("secChips").children;
+  for(let i=0;i<kids.length;i++)
+    kids[i].setAttribute("aria-pressed", +kids[i].dataset.sec===cfg.seconds ? "true":"false");
+  syncSetup();
+});
+$("fxStyleChips").addEventListener("click", function(e){
+  const b = e.target.closest("[data-fx]"); if(!b) return;
+  cfg.sparkStyle = b.dataset.fx; savePrefs(); syncFx();
+});
+$("fxAmountChips").addEventListener("click", function(e){
+  const b = e.target.closest("[data-amt]"); if(!b) return;
+  cfg.sparkAmount = b.dataset.amt; savePrefs(); syncFx();
+});
+$("tgAuto").addEventListener("click", function(){ cfg.autoAdvance = !cfg.autoAdvance; syncSetup(); });
+$("tgVoice").addEventListener("click", function(){
+  if(!voiceSupported()) return;
+  cfg.voice = !cfg.voice;
+  recFail = ""; recBlocked = false; recDry = 0; recBackoff = 400;
+  if(!cfg.voice){ voiceStop(); releaseMic(); }
+  savePrefs(); syncSetup();
+});
+$("btnMicTest").addEventListener("click", function(){
+  if(!voiceSupported()) return;
+  if(micTesting){ micTesting = false; voiceStop(); releaseMic();
+                  this.textContent = "Test microphone"; return; }
+  micTesting = true; recFail = ""; recBlocked = false;
+  $("micTestOut").textContent = "Asking for the microphone…";
+  this.textContent = "Stop";
+  const btn = this;
+  /* Same pre-flight the round uses, so the test proves the real path. */
+  holdMic(function(ok){
+    if(!micTesting) return;
+    if(!ok){
+      micTesting = false; btn.textContent = "Test microphone";
+      $("micTestOut").textContent = voiceReason();
+      syncSetup();
+      return;
+    }
+    $("micTestOut").textContent = "Listening — say a number…";
+    voiceStart();
+    checkPersistence();
+  });
+  setTimeout(function(){
+    if(micTesting){
+      micTesting = false; voiceStop(); releaseMic(); btn.textContent = "Test microphone";
+      if(!recFail) $("micTestOut").textContent = "Didn't hear a number. Try again, or check the mic.";
+      else $("micTestOut").textContent = voiceReason();
+    }
+  }, 8000);
+});
+$("hudMic").addEventListener("click", function(){
+  if(!voiceSupported()) return;
+  /* Blocked or dropped: this is a retry, not a toggle — don't make the player
+     switch it off and on again to get the mic back. */
+  if(recBlocked){ cfg.voice = true; savePrefs(); voiceRetry(); return; }
+  cfg.voice = !cfg.voice;
+  savePrefs();
+  if(cfg.voice) voiceRetry(); else { voiceStop(); releaseMic(); }
+});
+$("diffSlider").addEventListener("input", function(){
+  cfg.diff = +this.value; savePrefs(); syncSetup();
+});
+$("adaptChips").addEventListener("click", function(e){
+  const b = e.target.closest("[data-adapt]"); if(!b) return;
+  cfg.adaptive = b.dataset.adapt; savePrefs(); syncSetup();
+});
+$("btnStart").addEventListener("click", function(){
+  cfg.drill = null; cfg.drillFam = null; startRound();
+});
+
+$("keypad").addEventListener("click", function(e){
+  const b = e.target.closest("[data-k]"); if(!b) return;
+  typeKey(b.dataset.k);
+});
+
+$("btnSound").addEventListener("click", function(){
+  sound = !sound;
+  this.setAttribute("aria-pressed", sound ? "true":"false");
+  this.textContent = sound ? "Sound on" : "Sound off";
+  if(sound) sfx.tick();
+});
+$("btnSwitch").addEventListener("click", function(){ renderPlayers(); show("s-players"); });
+$("btnPause").addEventListener("click", pause);
+$("btnQuit").addEventListener("click", function(){
+  if(!run || run.over) return;
+  /* Backing out before the round is armed has nothing to report. */
+  if(!run.armed){
+    run.over = true;
+    cancelAnimationFrame(raf); voiceStop(); releaseMic(); stopFX();
+    show("s-setup");
+    return;
+  }
+  finish();
+});
+$("btnAgain").addEventListener("click", function(){ startRound(); });
+$("btnSettings").addEventListener("click", function(){
+  cfg.drill = null; cfg.drillFam = null; show("s-setup");
+});
+$("btnCopy").addEventListener("click", function(){
+  const btn = this, txt = summaryText();
+  function done(){ btn.textContent = "Copied"; setTimeout(function(){ btn.textContent = "Copy summary"; }, 1600); }
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(txt).then(done, fallback);
+    } else fallback();
+  }catch(e){ fallback(); }
+  function fallback(){
+    try{
+      const ta = document.createElement("textarea");
+      ta.value = txt; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); done();
+    }catch(e2){ btn.textContent = "Press Ctrl+C"; }
+  }
+});
+$("rFamDrill").addEventListener("click", function(e){
+  const b = e.target.closest("[data-fam]"); if(!b) return;
+  const p = b.dataset.fam.split(":");
+  cfg.drill = null;
+  cfg.drillFam = {op:p[0], fam:+p[1]};
+  startRound();
+});
+$("rHeatTabs").addEventListener("click", function(e){
+  const b = e.target.closest("[data-heat]"); if(!b) return;
+  heatOp = b.dataset.heat; renderHeat();
+});
+
+function pause(){
+  if(!run || run.over || run.paused || !run.armed) return;
+  run.paused = true;
+  run.pausedAt = performance.now();
+  voiceStop();
+  const ov = document.createElement("div");
+  ov.className = "pause";
+  ov.innerHTML = '<div class="box"><h2>Paused</h2>'+
+    '<p class="empty" style="margin:0 0 16px">The clock is stopped. Take your time.</p>'+
+    '<button class="btn" id="btnResume">Back to it</button></div>';
+  document.body.appendChild(ov);
+  $("btnResume").focus();
+  $("btnResume").addEventListener("click", function(){
+    const delta = performance.now() - run.pausedAt;
+    if(run.mode === "sprint") run.endAt += delta; else run.pEndAt += delta;
+    run.t0 += delta;
+    run.paused = false;
+    ov.remove();
+    if(cfg.voice && voiceSupported()) voiceStart();
+  });
+}
+
+document.addEventListener("keydown", function(e){
+  if(e.target && (e.target.tagName === "INPUT" || e.target.tagName === "SELECT")) return;
+  if(!$("s-play").classList.contains("on")) return;
+  if(e.key === "Escape"){
+    e.preventDefault();
+    if(run && run.paused){ const b = $("btnResume"); if(b) b.click(); } else pause();
+    return;
+  }
+  if(run && run.paused) return;
+  if(e.key >= "0" && e.key <= "9"){ e.preventDefault(); typeKey(e.key); }
+  else if(e.key === "Backspace"){ e.preventDefault(); typeKey("back"); }
+  else if(e.key === "Enter"){ e.preventDefault(); typeKey("enter"); }
+});
+
+/* ============================================================
+   Boot (with republish state carry-over)
+   ============================================================ */
+function start(state){
+  if(state && state.cfg) cfg = Object.assign(cfg, state.cfg);
+  if(state && typeof state.sound === "boolean"){
+    sound = state.sound;
+    $("btnSound").setAttribute("aria-pressed", sound ? "true":"false");
+    $("btnSound").textContent = sound ? "Sound on" : "Sound off";
+  }
+  buildSetup();
+  renderPlayers();
+  const last = state && state.player ? state.player : DB.last;
+  if(last && DB.players[last]) choosePlayer(DB.players[last]);
+  else show("s-players");
+}
+try{
+  if(window.claude && window.claude.hot && window.claude.hot.snapshot){
+    window.claude.hot.snapshot(function(){
+      return {cfg:cfg, sound:sound, player:player ? player.id : null};
+    });
+  }
+}catch(e){}
+if(window.claude && window.claude.hot && window.claude.hot.ready){
+  window.claude.hot.ready(start);
+}else{
+  start((window.claude && window.claude.hot && window.claude.hot.data) || {});
+}
+
+})();
+</script>
+<script>
+/* Offline + installable on phones. Only runs when served over http(s). */
+if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("sw.js").catch(function () {});
+  });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "Number Zoomies",
+  "short_name": "Zoomies",
+  "description": "A speedy math facts game: sprint and survival rounds for addition, subtraction, multiplication and division.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F5F3ED",
+  "theme_color": "#F5F3ED",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

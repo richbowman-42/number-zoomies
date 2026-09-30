@@ -670,7 +670,10 @@ td .opname i{width:10px;height:18px;border-radius:3px;display:block}
       <div class="scroll-x"><table id="detailsTable"></table></div>
       <p class="diffnote">In Survival, the time for each problem starts at the first number and
         shrinks toward the fastest one as right answers pile up: steeply at first, then more
-        gently. A missed answer stays on screen for the time shown before the next problem. Points
+        gently. After a miss, Survival takes the break shown with the timer frozen, so there's a
+        moment to reset; Sprint can't pause its clock, so a miss there shows only briefly. With voice
+        on, a right answer the recognizer delivers up to 1.2 seconds after Survival's time runs out
+        still counts. The answer stays hidden during that window, so it can't be read off the screen. Points
         per right answer are 10, plus a speed bonus, plus the current streak (up to 10), times the
         level's multiplier. Personal bests are kept separately for each mode and level. The level
         never changes which facts come up; that's set by operations and number range.</p>
@@ -941,12 +944,15 @@ function parseSpoken(text){
    explicit choices — only the pacing, the cushion on a miss, and the scoring. */
 const DIFF = [
   null,
-  {name:"Gentle", start:12000, decay:0.050, floor:3000, lives:4, showMiss:1600, mult:0.80},
-  {name:"Easy",   start:10000, decay:0.065, floor:2500, lives:3, showMiss:1300, mult:0.90},
-  {name:"Normal", start: 9000, decay:0.080, floor:2000, lives:3, showMiss:1000, mult:1.00},
-  {name:"Quick",  start: 7500, decay:0.100, floor:1600, lives:3, showMiss: 800, mult:1.15},
-  {name:"Fierce", start: 6000, decay:0.130, floor:1200, lives:2, showMiss: 600, mult:1.35}
+  {name:"Gentle", start:12000, decay:0.050, floor:3000, lives:4, showMiss:1600, missPause:3000, mult:0.80},
+  {name:"Easy",   start:10000, decay:0.065, floor:2500, lives:3, showMiss:1300, missPause:2750, mult:0.90},
+  {name:"Normal", start: 9000, decay:0.080, floor:2000, lives:3, showMiss:1000, missPause:2500, mult:1.00},
+  {name:"Quick",  start: 7500, decay:0.100, floor:1600, lives:3, showMiss: 800, missPause:2250, mult:1.15},
+  {name:"Fierce", start: 6000, decay:0.130, floor:1200, lives:2, showMiss: 600, missPause:2000, mult:1.35}
 ];
+/* showMiss: how long Sprint shows a missed answer (its clock keeps running).
+   missPause: Survival's break after a miss, with the timer frozen, so there's
+   a moment to reset before the next problem. */
 function diff(){ return DIFF[cfg.diff] || DIFF[3]; }
 
 /* How hard the adaptive engine leans on your weak spots. `rate` is the share of
@@ -1295,6 +1301,16 @@ function onVoiceResult(e){
     /* Spoken while a different problem was on screen: discard it rather than
        let it answer whatever is showing now. */
     if(recPid[i] !== pid){ recDone[i] = true; continue; }
+    /* Time just ran out on this problem: only a right answer still counts
+       (see timeUp); anything else simply waits out the window. */
+    if(run.grace && !run.paused){
+      if(parseSpoken(e.results[i][0].transcript) === run.problem.answer){
+        recDone[i] = true;
+        acceptLate(run.problem.answer);
+        return;
+      }
+      continue;
+    }
     if(run.paused || run.locked) continue;
 
     const r = e.results[i];
@@ -1517,7 +1533,7 @@ function syncSetup(){
     ? feel + " You get about " + plural(wholeSecs(d.start), "second", "seconds") +
       " for each problem. Every right answer makes the next one a bit quicker, but never " +
       "less than " + plural(wholeSecsDown(d.floor), "second", "seconds") + ". You have " +
-      plural(d.lives, "life", "lives") + "."
+      plural(d.lives, "life", "lives") + ". If you miss one, you get a little break before the next."
     : feel + " Harder levels give you more points for each right answer. " +
       "You always get the same kinds of problems.";
 
@@ -1667,14 +1683,22 @@ function pickFact(){
   if(cfg.drill && cfg.drill.length)
     return keyToFact(cfg.drill[Math.floor(Math.random()*cfg.drill.length)]);
 
+  /* Tricky facts and families come from the player's whole history, so keep
+     only the ones inside the chosen range — a 7 × 12 missed on the full set
+     mustn't turn up in a 0-to-5 round. */
+  const lo = cfg.min, hi = cfg.max;
+  const inRange = function(k){
+    const f = keyToFact(k);
+    return f.a >= lo && f.a <= hi && f.b >= (f.op === "div" ? Math.max(1, lo) : lo) && f.b <= hi;
+  };
   const ad = adapt();
   if(ad.rate > 0 && Math.random() < ad.rate){
     const op = cfg.ops[Math.floor(Math.random()*cfg.ops.length)];
     if(Math.random() < 0.6){
-      const tr = troubleList(op, ad.pool);
+      const tr = troubleList(op).filter(function(e){ return inRange(e[0]); }).slice(0, ad.pool);
       if(tr.length) return keyToFact(weightedPick(tr.map(function(e){ return [e[0], e[1]]; })));
     }
-    const wf = weakFamilies(op, 4);
+    const wf = weakFamilies(op).filter(function(x){ return x.fam >= lo && x.fam <= hi; }).slice(0, 4);
     if(wf.length){
       const w = weightedPick(wf.map(function(x){ return [x, x.score]; }));
       return famFact(op, w.fam, cfg.min, cfg.max);
@@ -1898,7 +1922,38 @@ function typeKey(k){
   if(cfg.autoAdvance && parseInt(typed,10) === run.problem.answer) submit();
 }
 
-function submit(timedOut, via){
+/* ---- voice grace ----
+   Recognition lags speech by up to a second, so "time's up" can land while a
+   right answer is still on its way. With voice on, a Survival timeout waits a
+   short window first: a right answer arriving in it counts. The problem stays
+   on screen and the answer stays hidden until the window closes, so there's no
+   question which problem a late word belongs to, and no reading it off. */
+const VOICE_GRACE_MS = 1200;
+
+function timeUp(){
+  if(!(cfg.voice && recWant && !recBlocked)){ submit(true); return; }
+  run.locked = true;
+  const g = run.grace = {pid: run.pid};
+  $("verdict").textContent = "Time's up… still listening!";
+  $("verdict").className = "verdict";
+  drawEquation();
+  (function settle(wait){
+    setTimeout(function(){
+      if(!run || run.over || run.grace !== g) return;
+      if(run.paused){ settle(250); return; }
+      run.grace = null; run.locked = false;
+      submit(true);
+    }, wait);
+  })(VOICE_GRACE_MS);
+}
+
+function acceptLate(n){
+  run.grace = null; run.locked = false;
+  typed = String(n);
+  submit(false, "voice", true);
+}
+
+function submit(timedOut, via, late){
   if(run.locked) return;
   run.locked = true;
   const p = run.problem;
@@ -1919,8 +1974,8 @@ function submit(timedOut, via){
     run.score += Math.round((10 + speedBonus + Math.min(run.streak, 10)) * d.mult);
     $("stage").classList.add("hit");
     const tier = streakTier(run.streak);
-    $("verdict").textContent = tier
-      ? TIER_WORD[tier] + "  " + run.streak + " in a row"
+    $("verdict").textContent = late ? "Yes! Just in time!"
+      : tier ? TIER_WORD[tier] + "  " + run.streak + " in a row"
       : "Yes!";
     $("verdict").className = "verdict ok";
     $("live").textContent = "Correct";
@@ -1945,7 +2000,11 @@ function submit(timedOut, via){
   drawEquation();
 
   const dd = DIFF[run.diff] || DIFF[3];
-  const wait = ok ? (reduce ? 60 : 240) : (reduce ? 300 : dd.showMiss);
+  /* Survival's miss break is about thinking time, not animation, so it holds
+     even with reduced motion. */
+  const wait = ok ? (reduce ? 60 : 240)
+    : run.mode === "survival" ? dd.missPause
+    : (reduce ? 300 : dd.showMiss);
   setTimeout(function(){
     if(!run || run.over) return;
     if(run.mode === "survival" && run.lives <= 0){ finish(); return; }
@@ -1963,11 +2022,14 @@ function loop(){
       $("hudClock").textContent = Math.ceil(left/1000)+"s";
       paintRod(left / (run.seconds*1000), left);
       if(left <= 0 && !run.locked){ finish(); return; }
-    }else{
+    }else if(!run.locked){
+      /* Survival's timer belongs to the open problem. While an answer is being
+         shown (or a late voice answer awaited) it holds still — no draining,
+         no ticking during the break. */
       const left = Math.max(0, run.pEndAt - now);
       $("hudClock").textContent = Math.ceil(left/1000)+"s";
       paintRod(left / run.pLimit, left);
-      if(left <= 0 && !run.locked){ submit(true); }
+      if(left <= 0) timeUp();
     }
   }
   raf = requestAnimationFrame(loop);
@@ -2725,12 +2787,13 @@ $("adaptChips").addEventListener("click", function(e){
 function renderDetails(){
   const s = function(ms){ return (ms/1000).toFixed(1) + "s"; };
   let html = '<thead><tr><th>Level</th><th>First problem</th><th>Fastest</th><th>Lives</th>' +
-             '<th>Miss shown</th><th>Points</th></tr></thead><tbody>';
+             '<th>Break after miss</th><th>Sprint miss shown</th><th>Points</th></tr></thead><tbody>';
   for(let i=1;i<DIFF.length;i++){
     const d = DIFF[i], cur = i === cfg.diff;
     html += '<tr' + (cur ? ' style="font-weight:700;background:var(--paper)"' : '') + '><td>' +
       d.name + (cur ? " ◀" : "") + '</td><td>' + s(d.start) + '</td><td>' + s(d.floor) +
-      '</td><td>' + d.lives + '</td><td>' + s(d.showMiss) + '</td><td>×' + d.mult.toFixed(2) +
+      '</td><td>' + d.lives + '</td><td>' + s(d.missPause) + '</td><td>' + s(d.showMiss) +
+      '</td><td>×' + d.mult.toFixed(2) +
       '</td></tr>';
   }
   $("detailsTable").innerHTML = html + "</tbody>";

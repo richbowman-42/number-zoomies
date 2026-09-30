@@ -394,6 +394,24 @@ input[type="range"]{flex:1;min-width:0;height:30px;accent-color:var(--op-mul);cu
   box-shadow:0 2px 0 var(--solid-shadow)}
 .keypad .back{font-size:1.2rem}
 
+/* "Pick it" answer buttons: 3 across, or 2 x 2 for four */
+.choices{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:420px;margin:18px auto 0}
+.choices.four{grid-template-columns:repeat(2,1fr);max-width:340px}
+.choice{
+  position:relative;border:2px solid var(--line-strong);background:var(--paper);color:var(--ink);
+  border-radius:var(--r-md);font-family:var(--f-display);font-weight:700;font-size:2.1rem;line-height:1;
+  padding:18px 0;min-height:76px;box-shadow:var(--shadow);font-variant-numeric:tabular-nums;
+}
+.choice small{position:absolute;top:6px;left:9px;font-family:var(--f-mono);font-size:.62rem;
+  font-weight:600;color:var(--muted)}
+.choice:active{transform:translateY(2px);box-shadow:none}
+.choice:disabled{cursor:default}
+.choice.right{background:var(--good);border-color:var(--good);color:#fff}
+.choice.wrong{background:var(--bad);border-color:var(--bad);color:#fff}
+.choice.right small,.choice.wrong small{color:rgba(255,255,255,.8)}
+/* key numbers only help where there's a keyboard */
+@media (hover:none){ .choice small{display:none} }
+
 .playfoot{display:flex;justify-content:center;gap:10px;margin-top:16px}
 
 .pause{
@@ -595,6 +613,12 @@ td .opname i{width:10px;height:18px;border-radius:3px;display:block}
         </div>
       </div>
 
+      <div class="field">
+        <span class="label">How do you answer?</span>
+        <div class="chips" id="styleChips"></div>
+        <p class="diffnote" id="styleNote"></p>
+      </div>
+
       <div class="field" id="secondsField">
         <span class="label">How long?</span>
         <div class="chips" id="secChips"></div>
@@ -716,6 +740,7 @@ td .opname i{width:10px;height:18px;border-radius:3px;display:block}
         <button data-k="0">0</button>
         <button class="enter" data-k="enter" style="grid-column:auto">Enter</button>
       </div>
+      <div class="choices" id="choices" hidden></div>
     </div>
 
     <div class="playfoot">
@@ -765,6 +790,15 @@ td .opname i{width:10px;height:18px;border-radius:3px;display:block}
         <span class="eyebrow">This round</span>
       </div>
       <div class="scroll-x"><table id="rTable"></table></div>
+    </div>
+
+    <div class="panel" id="rPickPanel" hidden>
+      <div class="panel-head">
+        <h2>Typing vs picking</h2>
+        <span class="eyebrow">Every game you've played</span>
+      </div>
+      <p class="lead" id="rPickLead"></p>
+      <div class="scroll-x"><table id="rPickTable"></table></div>
     </div>
 
     <div class="panel">
@@ -872,7 +906,7 @@ let DB = loadDB();
 let player = null;
 let cfg = {
   ops:["add","sub","mul","div"], min:0, max:12, rangePreset:"0-12",
-  mode:"survival", seconds:60, autoAdvance:true, adaptive:"balanced", diff:3,
+  mode:"survival", style:"type", seconds:60, autoAdvance:true, adaptive:"balanced", diff:3,
   drill:null, drillFam:null, sparkStyle:"confetti", sparkAmount:"normal", voice:false
 };
 
@@ -944,15 +978,16 @@ function parseSpoken(text){
    explicit choices — only the pacing, the cushion on a miss, and the scoring. */
 const DIFF = [
   null,
-  {name:"Gentle", start:12000, decay:0.050, floor:3000, lives:4, showMiss:1600, missPause:3000, mult:0.80},
-  {name:"Easy",   start:10000, decay:0.065, floor:2500, lives:3, showMiss:1300, missPause:2750, mult:0.90},
-  {name:"Normal", start: 9000, decay:0.080, floor:2000, lives:3, showMiss:1000, missPause:2500, mult:1.00},
-  {name:"Quick",  start: 7500, decay:0.100, floor:1600, lives:3, showMiss: 800, missPause:2250, mult:1.15},
-  {name:"Fierce", start: 6000, decay:0.130, floor:1200, lives:2, showMiss: 600, missPause:2000, mult:1.35}
+  {name:"Gentle", start:12000, decay:0.050, floor:3000, lives:4, showMiss:1600, missPause:3000, choices:3, mult:0.80},
+  {name:"Easy",   start:10000, decay:0.065, floor:2500, lives:3, showMiss:1300, missPause:2750, choices:3, mult:0.90},
+  {name:"Normal", start: 9000, decay:0.080, floor:2000, lives:3, showMiss:1000, missPause:2500, choices:4, mult:1.00},
+  {name:"Quick",  start: 7500, decay:0.100, floor:1600, lives:3, showMiss: 800, missPause:2250, choices:4, mult:1.15},
+  {name:"Fierce", start: 6000, decay:0.130, floor:1200, lives:2, showMiss: 600, missPause:2000, choices:6, mult:1.35}
 ];
 /* showMiss: how long Sprint shows a missed answer (its clock keeps running).
    missPause: Survival's break after a miss, with the timer frozen, so there's
-   a moment to reset before the next problem. */
+   a moment to reset before the next problem.
+   choices: how many answer buttons "Pick it" shows at this level. */
 function diff(){ return DIFF[cfg.diff] || DIFF[3]; }
 
 /* How hard the adaptive engine leans on your weak spots. `rate` is the share of
@@ -1368,6 +1403,7 @@ function choosePlayer(p){
   cfg.diff = DIFF[p.diff] ? p.diff : 3;
   cfg.adaptive = ADAPT[p.adaptive] ? p.adaptive : "balanced";
   cfg.voice = !!p.voice && voiceSupported();
+  cfg.style = p.style === "pick" ? "pick" : "type";
   $("diffSlider").value = cfg.diff;
   syncFx();
   syncSetup();
@@ -1393,10 +1429,11 @@ function greet(p){
     : "Great to see you again. Every round makes you a little quicker!";
 }
 
-function bestKey(mode, d){ return mode + ":" + d; }
+/* Picked rounds keep their own bests; typed keys are unchanged so old bests still count. */
+function bestKey(mode, d, style){ return mode + ":" + d + (style === "pick" ? ":pick" : ""); }
 function showBest(){
   const b = (player && player.best) || {};
-  const v = b[bestKey(cfg.mode, cfg.diff)];
+  const v = b[bestKey(cfg.mode, cfg.diff, cfg.style)];
   $("setupBest").textContent = v ? "Your best here: " + v + " points" : "";
 }
 
@@ -1450,6 +1487,14 @@ function buildSetup(){
     b.setAttribute("aria-pressed", cfg.seconds===s[0] ? "true":"false");
     b.innerHTML = '<span class="dot" style="--c:var(--ink)"></span>'+s[1];
     sBox.appendChild(b);
+  });
+  const stBox = $("styleChips"); stBox.innerHTML = "";
+  [["type","Type it"],["pick","Pick it"]].forEach(function(o){
+    const b = document.createElement("button");
+    b.className = "chip"; b.dataset.style = o[0];
+    b.style.setProperty("--c", "var(--ink)");
+    b.innerHTML = '<span class="dot"></span>'+o[1];
+    stBox.appendChild(b);
   });
   const adBox = $("adaptChips"); adBox.innerHTML = "";
   ADAPT_ORDER.forEach(function(k){
@@ -1507,6 +1552,7 @@ function savePrefs(){
   player.diff = cfg.diff;
   player.adaptive = cfg.adaptive;
   player.voice = cfg.voice;
+  player.style = cfg.style;
   saveDB();
 }
 
@@ -1517,6 +1563,12 @@ function syncSetup(){
   for(let i=0;i<cards.length;i++)
     cards[i].setAttribute("aria-pressed", cards[i].dataset.mode===cfg.mode ? "true":"false");
   $("tgAuto").setAttribute("aria-pressed", cfg.autoAdvance ? "true":"false");
+  const sc = $("styleChips").children;
+  for(let i=0;i<sc.length;i++)
+    sc[i].setAttribute("aria-pressed", sc[i].dataset.style===cfg.style ? "true":"false");
+  $("styleNote").textContent = cfg.style === "pick"
+    ? "Tap the right answer from " + diff().choices + " choices. Harder levels give you more to choose from."
+    : "Type your answer on the number pad.";
 
   const canVoice = voiceSupported();
   if(!canVoice) cfg.voice = false;
@@ -1734,7 +1786,7 @@ function startRound(){
     mode: cfg.mode, seconds: cfg.seconds, ops: cfg.ops.slice(),
     min: cfg.min, max: cfg.max, drill: cfg.drill ? cfg.drill.slice() : null,
     drillFam: cfg.drillFam ? {op:cfg.drillFam.op, fam:cfg.drillFam.fam} : null,
-    diff: cfg.diff, adaptive: cfg.adaptive,
+    diff: cfg.diff, adaptive: cfg.adaptive, style: cfg.style, nChoices: diff().choices,
     started: Date.now(), attempts: [], correct: 0, score: 0,
     streak: 0, bestStreak: 0, lives: diff().lives, maxLives: diff().lives,
     pid: 0, over: false, locked: false, paused: false
@@ -1746,8 +1798,13 @@ function startRound(){
   $("hudLives").hidden = cfg.mode !== "survival";
   $("hudClock").hidden = false;
   const canTalk = cfg.voice && voiceSupported() && !recBlocked;
-  $("playHint").textContent = (canTalk ? "Say it or type it!" : "Type your answer!") +
-    (cfg.autoAdvance ? "" : " Then press Enter.");
+  const pick = cfg.style === "pick";
+  $("playHint").textContent = pick
+    ? (canTalk ? "Say it or tap it!" : "Tap the right answer!")
+    : (canTalk ? "Say it or type it!" : "Type your answer!") + (cfg.autoAdvance ? "" : " Then press Enter.");
+  $("keypad").hidden = pick;
+  $("choices").hidden = !pick;
+  $("choices").innerHTML = "";
   const rod = $("rod"); rod.innerHTML = "";
   for(let i=0;i<20;i++) rod.appendChild(document.createElement("i"));
   for(let i=0;i<rod.children.length;i++) rod.children[i].classList.add("lit");
@@ -1828,6 +1885,7 @@ function nextProblem(){
      voice player may never type to trigger a redraw. */
   run.locked = false;
   drawEquation();
+  if(run.style === "pick") drawChoices();
 }
 
 function drawEquation(){
@@ -1837,8 +1895,96 @@ function drawEquation(){
     '<span class="o">'+OPS[p.op].sym+'</span>'+
     '<span>'+p.right+'</span>'+
     '<span class="eq">=</span>'+
-    '<span class="slot'+(typed?"":" blank")+'">'+(typed || " ")+
-      (run.locked ? "" : '<span class="caret"></span>')+'</span>';
+    '<span class="slot'+(typed?"":" blank")+'">'+(typed || (run.style === "pick" ? "?" : " "))+
+      (run.locked || run.style === "pick" ? "" : '<span class="caret"></span>')+'</span>';
+}
+
+/* ---- "Pick it" wrong answers ----
+   Built from the mistakes kids really make, so a choice can't be ruled out at
+   a glance: a neighbouring fact (7 x 8 -> 48 or 63), off by one or two, the
+   wrong operation (7 + 8 = 15 offered for 7 x 8), or swapped digits (56 -> 65).
+   Never both "one more" and "one less", or the answer would be the one in the
+   middle. Everything is a whole number, never negative, never repeated. */
+function makeChoices(p, count){
+  const ans = p.answer, x = p.left, y = p.right;
+  const cap = Math.max(ans*2 + 2, ans + 12);
+  const pool = [];   /* [value, weight] */
+  const add = function(v, w){ pool.push([v, w]); };
+  const rev = function(n){
+    const t = Math.floor(n/10), u = n % 10;
+    /* 80 "swapped" is 08 = 8, which nobody writes by mistake */
+    return (n >= 10 && n < 100 && t !== u && u !== 0) ? u*10 + t : -1;
+  };
+  add(ans+1, 3); add(ans-1, 3);
+  add(ans+2, 2); add(ans-2, 2);
+  add(rev(ans), 2);
+  add(ans+10, 1); add(ans-10, 1);
+  if(p.op === "mul"){
+    add(x*(y+1), 3); add(x*(y-1), 3); add((x+1)*y, 3); add((x-1)*y, 3);
+    add(x + y, 2);
+  }else if(p.op === "add"){
+    if(x >= 2 && y >= 2) add(x * y, 2);
+    add(Math.abs(x - y), 2);
+  }else if(p.op === "sub"){          /* x - y = ans */
+    add(x + y, 2); add(y, 2);
+  }else{                             /* x / y = ans */
+    add(y, 2);
+    if(x % (y+1) === 0) add(x/(y+1), 3);
+    if(y > 1 && x % (y-1) === 0) add(x/(y-1), 3);
+  }
+  const picked = [], seen = {}; seen[ans] = true;
+  let rows = pool.filter(function(r){
+    const v = r[0];
+    if(!Number.isInteger(v) || v < 0 || v > cap || seen[v]) return false;
+    seen[v] = true; return true;
+  });
+  while(picked.length < count-1 && rows.length){
+    let total = 0; rows.forEach(function(r){ total += r[1]; });
+    let t = Math.random()*total, i = 0;
+    while(i < rows.length-1 && (t -= rows[i][1]) > 0) i++;
+    const v = rows[i][0];
+    picked.push(v);
+    /* one of each mirror pair only */
+    const mirror = v === ans+1 ? ans-1 : v === ans-1 ? ans+1 : v === ans+2 ? ans-2 : v === ans-2 ? ans+2 : null;
+    rows = rows.filter(function(r){ return r[0] !== v && r[0] !== mirror; });
+  }
+  for(let k = 3; picked.length < count-1 && k < 40; k++){
+    const v = ans + (k % 2 ? 1 : -1) * Math.ceil(k/2);
+    if(v >= 0 && picked.indexOf(v) < 0 && v !== ans) picked.push(v);
+  }
+  const all = picked.concat([ans]);
+  for(let i = all.length-1; i > 0; i--){
+    const j = Math.floor(Math.random()*(i+1)); const t = all[i]; all[i] = all[j]; all[j] = t;
+  }
+  return all;
+}
+
+function drawChoices(){
+  const vals = run.choiceVals = makeChoices(run.problem, run.nChoices || 4);
+  const box = $("choices");
+  box.className = "choices" + (vals.length === 4 ? " four" : "");
+  box.innerHTML = vals.map(function(v, i){
+    return '<button class="choice" data-choice="'+i+'" aria-label="'+v+'"><small>'+(i+1)+'</small>'+v+'</button>';
+  }).join("");
+}
+
+function pickChoice(i){
+  if(!run || run.over || run.locked || run.paused || run.style !== "pick") return;
+  const v = run.choiceVals && run.choiceVals[i];
+  if(v === undefined) return;
+  typed = String(v);
+  submit(false, "tap");
+}
+
+/* After an answer: the right one turns green, a wrong pick red. */
+function markChoices(given, answer){
+  const kids = $("choices").children;
+  for(let i=0;i<kids.length;i++){
+    const v = run.choiceVals[i];
+    kids[i].disabled = true;
+    if(v === answer) kids[i].classList.add("right");
+    else if(v === given) kids[i].classList.add("wrong");
+  }
 }
 
 /* ---- streak celebration: escalates at 5 / 10 / 20, all of it in the outer
@@ -1964,7 +2110,7 @@ function submit(timedOut, via, late){
 
   run.attempts.push({op:p.op, key:p.key, left:p.left, right:p.right,
                      answer:p.answer, given:given, ok:ok, ms:ms, timedOut:!!timedOut,
-                     via: via || "keys"});
+                     via: via || "keys", style: run.style});
 
   if(ok){
     run.correct++; run.streak++;
@@ -1998,6 +2144,7 @@ function submit(timedOut, via, late){
   $("hudStreak").textContent = run.streak;
   updateStreakFX();
   drawEquation();
+  if(run.style === "pick") markChoices(given, p.answer);
 
   const dd = DIFF[run.diff] || DIFF[3];
   /* Survival's miss break is about thinking time, not animation, so it holds
@@ -2064,8 +2211,12 @@ function finish(){
    ============================================================ */
 function commitRun(){
   if(!player.facts) player.facts = {};
+  /* Picked answers keep their own book. Choosing is easier than recalling and
+     a guess can land, so mixing them in would flatter typed speed, accuracy and
+     the tricky-fact lists. Kept apart, the two can be compared fact by fact. */
+  const book = run.style === "pick" ? (player.pfacts || (player.pfacts = {})) : player.facts;
   run.attempts.forEach(function(a){
-    const s = player.facts[a.key] || (player.facts[a.key] = {n:0, ok:0, times:[]});
+    const s = book[a.key] || (book[a.key] = {n:0, ok:0, times:[]});
     s.n++;
     if(a.ok){
       s.ok++;
@@ -2084,7 +2235,7 @@ function commitRun(){
   const summary = {
     at: run.started, mode: run.mode, seconds: run.seconds, ops: run.ops,
     min: run.min, max: run.max, drill: !!(run.drill || run.drillFam),
-    d: run.diff, adaptive: run.adaptive,
+    d: run.diff, adaptive: run.adaptive, style: run.style,
     score: run.score, correct: run.correct, total: run.attempts.length,
     bestStreak: run.bestStreak,
     median: Math.round(median(run.attempts.filter(function(a){return a.ok;})
@@ -2097,7 +2248,7 @@ function commitRun(){
   if(!player.best) player.best = {};
   run.isPB = false;
   /* Personal bests are kept per difficulty, so a Gentle score never beats a Fierce one. */
-  const bk = bestKey(run.mode, run.diff);
+  const bk = bestKey(run.mode, run.diff, run.style);
   if(!run.drill && !run.drillFam && (!player.best[bk] || run.score > player.best[bk])){
     if(player.best[bk]) run.isPB = true;
     player.best[bk] = run.score;
@@ -2125,7 +2276,7 @@ function renderResults(){
   $("rScore").textContent = run.score;
   $("rSub").textContent = player.name + " · " + run.correct + " right out of " + A.length + " · " +
     (run.mode === "sprint" ? run.seconds+"-second sprint" : "Survival") +
-    " · " + (DIFF[run.diff]||DIFF[3]).name +
+    " · " + (DIFF[run.diff]||DIFF[3]).name + (run.style === "pick" ? " · Pick it" : "") +
     (run.drillFam ? " · practicing " + famLabel(run.drillFam.op, run.drillFam.fam)
                   : run.drill ? " · practice round" : "");
   $("rPB").innerHTML = run.isPB ? '<div class="pb">★ New best score!</div>' : "";
@@ -2159,6 +2310,7 @@ function renderResults(){
   renderFluency(A);
   $("rTrace").innerHTML = traceSVG(A, med);
   renderTable(A);
+  renderPick();
   renderHeat();
   renderFamilies();
   renderTrouble();
@@ -2228,6 +2380,42 @@ function traceSVG(A, med){
     'style="fill:var(--muted)">problem 1</text>'+
     '<text x="'+(W-padR)+'" y="'+(H-6)+'" text-anchor="end" font-size="11" '+
     'font-family="IBM Plex Mono, monospace" style="fill:var(--muted)">problem '+A.length+'</text></svg>';
+}
+
+/* Usual typed vs picked time for each kind of math, over all rounds. The gap
+   is roughly how long entering the answer takes, apart from knowing it. Only
+   plain typed/tapped times count; spoken ones carry recognition lag. */
+function pickCompare(){
+  const out = [];
+  OP_ORDER.forEach(function(op){
+    const typed = [], picked = [];
+    const gather = function(book, into){
+      for(const k in (book || {})) if(k.indexOf(op+"|") === 0) into.push.apply(into, book[k].times || []);
+    };
+    gather(player.facts, typed); gather(player.pfacts, picked);
+    if(typed.length >= 3 && picked.length >= 3)
+      out.push({op:op, typed:median(typed), picked:median(picked), nt:typed.length, np:picked.length});
+  });
+  return out;
+}
+function renderPick(){
+  const rows = pickCompare();
+  $("rPickPanel").hidden = !rows.length;
+  if(!rows.length) return;
+  let html = '<thead><tr><th>Math</th><th>Typing</th><th>Picking</th></tr></thead><tbody>';
+  let gap = 0;
+  rows.forEach(function(r){
+    gap += r.typed - r.picked;
+    html += '<tr><td><span class="opname"><i style="background:'+OPS[r.op].color+'"></i>'+
+      OPS[r.op].name+'</span></td><td>'+kidSec(r.typed)+'</td><td>'+kidSec(r.picked)+'</td></tr>';
+  });
+  $("rPickTable").innerHTML = html + "</tbody>";
+  gap /= rows.length;
+  $("rPickLead").textContent = (Math.abs(gap) < 1000
+      ? "Picking and typing take you about the same time."
+      : gap > 0 ? "Picking is about " + plural(Math.round(gap/1000), "second", "seconds") + " quicker than typing for you."
+                : "Typing is about " + plural(Math.round(-gap/1000), "second", "seconds") + " quicker than picking for you.") +
+    " (Grown-ups: exact times are in Copy summary.)";
 }
 
 function renderTable(A){
@@ -2410,11 +2598,12 @@ function renderTrouble(){
 
 function renderHistory(){
   const runs = (player.runs||[]).filter(function(r){
-    return r.mode === run.mode && !r.drill && (r.d || 3) === run.diff;
+    return r.mode === run.mode && !r.drill && (r.d || 3) === run.diff &&
+      (r.style || "type") === (run.style || "type");
   });
   const panel = $("rHistoryPanel");
   $("rHistLabel").textContent = (run.mode === "sprint" ? "Sprint" : "Survival") +
-    " scores on " + (DIFF[run.diff]||DIFF[3]).name;
+    " scores on " + (DIFF[run.diff]||DIFF[3]).name + (run.style === "pick" ? ", Pick it" : "");
   if(runs.length < 2){
     $("rHistory").innerHTML = '<p class="empty">Play a couple more rounds on this level and '+
       'you will see a line showing your scores climb!</p>';
@@ -2476,6 +2665,13 @@ function summaryText(){
     "Typical answer time: "+(med?secs(med)+"s":"—"),
     "Best streak: "+run.bestStreak
   ];
+  if(run.style === "pick") lines.splice(3, 0, "Answer style: Pick it (" + (run.nChoices || 4) + " choices)");
+  const pc = pickCompare();
+  if(pc.length){
+    lines.push("", "Typed vs picked, usual time (all rounds): " + pc.map(function(r){
+      return OPS[r.op].short + " " + secs(r.typed) + "s / " + secs(r.picked) + "s";
+    }).join(", "));
+  }
   const spk = A.filter(function(a){ return a.via === "voice"; });
   if(spk.length) lines.push("Answered by voice: "+spk.length+" of "+A.length);
   const wf = allWeakFamilies(3);
@@ -2562,13 +2758,15 @@ function mergePlayer(cur, inc){
   let facts;
   if(shared) facts = (incRuns.length > curRuns.length ? inc.facts : cur.facts) || {};
   else facts = mergeFacts(cur.facts, inc.facts);
+  const pfacts = shared ? ((incRuns.length > curRuns.length ? inc.pfacts : cur.pfacts) || {})
+                        : mergeFacts(cur.pfacts, inc.pfacts);
   const runs = curRuns.concat(incRuns.filter(function(r){ return !seen[r.at]; }))
     .sort(function(x,y){ return x.at - y.at; }).slice(-60);
   const best = Object.assign({}, cur.best || {});
   const ib = inc.best || {};
   for(const k in ib) if(!best[k] || ib[k] > best[k]) best[k] = ib[k];
   return Object.assign({}, cur, {
-    facts:facts, runs:runs, best:best,
+    facts:facts, pfacts:pfacts, runs:runs, best:best, style: inc.style || cur.style,
     fx: inc.fx || cur.fx, diff: inc.diff || cur.diff,
     adaptive: inc.adaptive || cur.adaptive, voice: !!(inc.voice || cur.voice)
   });
@@ -2593,8 +2791,10 @@ function importBackup(raw){
         if(DB.players[k].name.toLowerCase() === name.toLowerCase()){ matchId = k; break; }
       }
     }
-    const clean = {id:id, name:name, facts:inc.facts || {}, runs:Array.isArray(inc.runs) ? inc.runs : [],
-                   best:inc.best || {}, fx:inc.fx, diff:inc.diff, adaptive:inc.adaptive, voice:inc.voice};
+    const clean = {id:id, name:name, facts:inc.facts || {}, pfacts:inc.pfacts || {},
+                   runs:Array.isArray(inc.runs) ? inc.runs : [],
+                   best:inc.best || {}, fx:inc.fx, diff:inc.diff, adaptive:inc.adaptive, voice:inc.voice,
+                   style: inc.style === "pick" ? "pick" : "type"};
     if(matchId){
       DB.players[matchId] = mergePlayer(DB.players[matchId], clean);
       DB.players[matchId].id = matchId;
@@ -2787,13 +2987,13 @@ $("adaptChips").addEventListener("click", function(e){
 function renderDetails(){
   const s = function(ms){ return (ms/1000).toFixed(1) + "s"; };
   let html = '<thead><tr><th>Level</th><th>First problem</th><th>Fastest</th><th>Lives</th>' +
-             '<th>Break after miss</th><th>Sprint miss shown</th><th>Points</th></tr></thead><tbody>';
+             '<th>Break after miss</th><th>Sprint miss shown</th><th>Pick it buttons</th><th>Points</th></tr></thead><tbody>';
   for(let i=1;i<DIFF.length;i++){
     const d = DIFF[i], cur = i === cfg.diff;
     html += '<tr' + (cur ? ' style="font-weight:700;background:var(--paper)"' : '') + '><td>' +
       d.name + (cur ? " ◀" : "") + '</td><td>' + s(d.start) + '</td><td>' + s(d.floor) +
       '</td><td>' + d.lives + '</td><td>' + s(d.missPause) + '</td><td>' + s(d.showMiss) +
-      '</td><td>×' + d.mult.toFixed(2) +
+      '</td><td>' + d.choices + '</td><td>×' + d.mult.toFixed(2) +
       '</td></tr>';
   }
   $("detailsTable").innerHTML = html + "</tbody>";
@@ -2808,6 +3008,14 @@ $("btnStart").addEventListener("click", function(){
 $("keypad").addEventListener("click", function(e){
   const b = e.target.closest("[data-k]"); if(!b) return;
   typeKey(b.dataset.k);
+});
+$("choices").addEventListener("click", function(e){
+  const b = e.target.closest("[data-choice]"); if(!b) return;
+  pickChoice(+b.dataset.choice);
+});
+$("styleChips").addEventListener("click", function(e){
+  const b = e.target.closest("[data-style]"); if(!b) return;
+  cfg.style = b.dataset.style; savePrefs(); syncSetup();
 });
 
 $("btnSound").addEventListener("click", function(){
@@ -2920,6 +3128,11 @@ document.addEventListener("keydown", function(e){
     return;
   }
   if(run && run.paused) return;
+  /* Picking: number keys choose a button by position, never type an answer. */
+  if(run && run.style === "pick"){
+    if(e.key >= "1" && e.key <= "9"){ e.preventDefault(); pickChoice(+e.key - 1); }
+    return;
+  }
   if(e.key >= "0" && e.key <= "9"){ e.preventDefault(); typeKey(e.key); }
   else if(e.key === "Backspace"){ e.preventDefault(); typeKey("back"); }
   else if(e.key === "Enter"){ e.preventDefault(); typeKey("enter"); }

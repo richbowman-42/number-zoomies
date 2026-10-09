@@ -35,3 +35,5 @@ followed by subtraction, or addition followed by division.
 - Storage: e.g. `player.pairs["add>sub"] = {n, ok, times: [last 30]}`, plus a
   per-round summary for the trend. Needs the backup merge code
   (`mergePlayer`) updated to handle it.
+
+Change default to pick one, instead of type one, possibly reduce the time allowed

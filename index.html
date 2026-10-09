@@ -193,10 +193,19 @@ input[type="text"]:focus-visible,button:focus-visible,select:focus-visible{
   display:flex;align-items:center;gap:8px;
 }
 .chip .dot{width:12px;height:12px;border-radius:3px;background:var(--line-strong)}
-.chip[aria-pressed="true"]{border-color:var(--ink);background:var(--paper)}
+/* Selected chips go solid so on and off read at a glance, even across a room. */
+.chip{color:var(--ink)}
+.chip[aria-pressed="true"]{border-color:var(--solid);background:var(--solid);color:var(--on-solid);
+  box-shadow:0 2px 0 var(--solid-shadow)}
 .chip[aria-pressed="true"] .dot{background:var(--c)}
-.chip.op[aria-pressed="true"]{border-color:var(--c);box-shadow:0 2px 0 var(--c)}
+.chip[aria-pressed="true"] small{color:inherit !important;opacity:.75}
+/* Kinds of math fill with their own rod colour; orange is too light for white text. */
+.chip.op{--on-c:#FFFFFF}
+.chip.op[data-op="mul"]{--on-c:#1A2430}
+.chip.op[aria-pressed="true"]{border-color:var(--c);background:var(--c);color:var(--on-c);
+  box-shadow:0 2px 0 var(--solid-shadow)}
 .chip .sym{font-family:var(--f-display);font-size:1.15rem;line-height:1;color:var(--c)}
+.chip.op[aria-pressed="true"] .sym{color:var(--on-c)}
 .chip[aria-pressed="false"] .sym{color:var(--muted)}
 
 .modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
@@ -204,11 +213,17 @@ input[type="text"]:focus-visible,button:focus-visible,select:focus-visible{
   text-align:left;border:2px solid var(--line-strong);background:var(--card);
   border-radius:var(--r-md);padding:14px 16px;box-shadow:var(--shadow);
 }
-.mode[aria-pressed="true"]{border-color:var(--ink);box-shadow:var(--shadow-lift)}
+.mode{color:var(--ink)}
+.mode[aria-pressed="true"]{border-color:var(--solid);background:var(--solid);color:var(--on-solid);
+  box-shadow:0 6px 0 var(--solid-shadow)}
+.mode[aria-pressed="true"] span{color:inherit;opacity:.8}
 .mode strong{display:block;font-family:var(--f-display);font-size:1.1rem;margin-bottom:3px}
 .mode span{display:block;font-size:.84rem;color:var(--muted);line-height:1.45}
 
-.range-custom{display:flex;align-items:center;gap:8px;font-size:.9rem;font-weight:600}
+.range-custom{display:flex;flex-direction:column;gap:8px}
+.range-custom .sublabel{font-size:.9rem;font-weight:600}
+.famchips{display:grid;grid-template-columns:repeat(auto-fill,minmax(46px,1fr));max-width:480px;margin-bottom:6px}
+.famchips .chip{justify-content:center;padding:10px 0;font-family:var(--f-display);font-size:1.1rem}
 select{
   font:inherit;font-weight:600;border:2px solid var(--line-strong);border-radius:var(--r-sm);
   padding:7px 10px;background:var(--card);color:var(--ink);
@@ -591,10 +606,10 @@ td .opname i{width:10px;height:18px;border-radius:3px;display:block}
         <span class="label">Which numbers?</span>
         <div class="chips" id="rangeChips" style="margin-bottom:10px"></div>
         <div class="range-custom" id="rangeCustom" hidden>
-          <label for="rangeMin">From</label>
-          <select id="rangeMin"></select>
-          <label for="rangeMax">to</label>
-          <select id="rangeMax"></select>
+          <span class="sublabel">Which number families? Pick one or more.</span>
+          <div class="chips famchips" id="famChips"></div>
+          <span class="sublabel">Mixed with the numbers</span>
+          <div class="chips" id="partnerChips"></div>
         </div>
       </div>
 
@@ -905,7 +920,7 @@ function saveDB(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }ca
 let DB = loadDB();
 let player = null;
 let cfg = {
-  ops:["add","sub","mul","div"], min:0, max:12, rangePreset:"0-12",
+  ops:["add","sub","mul","div"], min:0, max:12, rangePreset:"0-12", fams:[], famMax:12,
   mode:"survival", style:"type", seconds:60, autoAdvance:true, adaptive:"balanced", diff:3,
   drill:null, drillFam:null, sparkStyle:"confetti", sparkAmount:"normal", voice:false
 };
@@ -1468,31 +1483,40 @@ function buildSetup(){
     const b = document.createElement("button");
     b.className = "chip"; b.dataset.range = r[0];
     b.setAttribute("aria-pressed", cfg.rangePreset===r[0] ? "true":"false");
-    b.innerHTML = '<span class="dot" style="--c:var(--ink)"></span>'+r[1]+
+    b.innerHTML = '<span class="dot" style="--c:currentColor"></span>'+r[1]+
       (r[2] ? ' <small style="color:var(--muted);font-weight:500">'+r[2]+'</small>' : "");
     rBox.appendChild(b);
   });
-  ["rangeMin","rangeMax"].forEach(function(id){
-    const s = $(id); s.innerHTML = "";
-    for(let i=0;i<=12;i++){
-      const o = document.createElement("option"); o.value = i; o.textContent = i; s.appendChild(o);
-    }
+  const fBox = $("famChips"); fBox.innerHTML = "";
+  for(let f=0; f<=12; f++){
+    const b = document.createElement("button");
+    b.className = "chip"; b.dataset.fam = f;
+    b.setAttribute("aria-pressed", cfg.fams.indexOf(f)>=0 ? "true":"false");
+    b.setAttribute("aria-label", "the " + f + "s");
+    b.textContent = f;
+    fBox.appendChild(b);
+  }
+  const pBox = $("partnerChips"); pBox.innerHTML = "";
+  [5,10,12].forEach(function(m){
+    const b = document.createElement("button");
+    b.className = "chip"; b.dataset.partner = m;
+    b.innerHTML = '<span class="dot" style="--c:currentColor"></span>0 to '+m;
+    pBox.appendChild(b);
   });
-  $("rangeMin").value = cfg.min; $("rangeMax").value = cfg.max;
 
   const sBox = $("secChips"); sBox.innerHTML = "";
   [[60,"60 seconds"],[90,"90 seconds"],[120,"2 minutes"]].forEach(function(s){
     const b = document.createElement("button");
     b.className = "chip"; b.dataset.sec = s[0];
     b.setAttribute("aria-pressed", cfg.seconds===s[0] ? "true":"false");
-    b.innerHTML = '<span class="dot" style="--c:var(--ink)"></span>'+s[1];
+    b.innerHTML = '<span class="dot" style="--c:currentColor"></span>'+s[1];
     sBox.appendChild(b);
   });
   const stBox = $("styleChips"); stBox.innerHTML = "";
   [["type","Type it"],["pick","Pick it"]].forEach(function(o){
     const b = document.createElement("button");
     b.className = "chip"; b.dataset.style = o[0];
-    b.style.setProperty("--c", "var(--ink)");
+    b.style.setProperty("--c", "currentColor");
     b.innerHTML = '<span class="dot"></span>'+o[1];
     stBox.appendChild(b);
   });
@@ -1500,7 +1524,7 @@ function buildSetup(){
   ADAPT_ORDER.forEach(function(k){
     const b = document.createElement("button");
     b.className = "chip"; b.dataset.adapt = k;
-    b.style.setProperty("--c", "var(--ink)");
+    b.style.setProperty("--c", "currentColor");
     b.innerHTML = '<span class="dot"></span>'+ADAPT[k].name;
     adBox.appendChild(b);
   });
@@ -1518,7 +1542,7 @@ function buildSetup(){
   AMOUNT_ORDER.forEach(function(k){
     const b = document.createElement("button");
     b.className = "chip"; b.dataset.amt = k;
-    b.style.setProperty("--c", "var(--ink)");
+    b.style.setProperty("--c", "currentColor");
     b.innerHTML = '<span class="dot"></span>'+AMOUNT[k].name;
     amBox.appendChild(b);
   });
@@ -1558,6 +1582,9 @@ function savePrefs(){
 
 function syncSetup(){
   $("rangeCustom").hidden = cfg.rangePreset !== "custom";
+  const pk = $("partnerChips").children;
+  for(let i=0;i<pk.length;i++)
+    pk[i].setAttribute("aria-pressed", +pk[i].dataset.partner===cfg.max ? "true":"false");
   $("secondsField").hidden = cfg.mode !== "sprint";
   const cards = $("modeCards").children;
   for(let i=0;i<cards.length;i++)
@@ -1594,8 +1621,10 @@ function syncSetup(){
     chips[i].setAttribute("aria-pressed", chips[i].dataset.adapt===cfg.adaptive ? "true":"false");
   $("adaptNote").textContent = ad.kid;
 
-  $("btnStart").disabled = cfg.ops.length === 0;
+  const noFams = cfg.rangePreset === "custom" && !cfg.fams.length;
+  $("btnStart").disabled = cfg.ops.length === 0 || noFams;
   $("btnStart").textContent = cfg.ops.length === 0 ? "Pick at least one kind of math"
+    : noFams ? "Pick at least one number family"
     : (cfg.mode==="sprint" ? "Start "+cfg.seconds+"-second sprint" : "Start survival round");
   showBest();
 }
@@ -1688,22 +1717,43 @@ function famFact(op, fam, lo, hi){
 }
 function famLabel(op, fam){ return "the " + fam + "s in " + OPS[op].name.toLowerCase(); }
 
+/* The chosen families for a Custom round (sorted), or null for a plain range.
+   With families, a fact counts if one number is a chosen family and the other
+   is in the min-to-max range: the 7s up to 10 runs 7 + 0 through 7 + 10. */
+function activeFams(){
+  return (cfg.rangePreset === "custom" && cfg.fams.length) ? cfg.fams : null;
+}
+function inPractice(op, a, b){
+  if(op === "div" && b < 1) return false;
+  const lo = cfg.min, hi = cfg.max, fams = activeFams();
+  const ok = function(x){ return x >= lo && x <= hi; };
+  if(!fams) return ok(a) && ok(b);
+  return (fams.indexOf(a) >= 0 && ok(b)) || (fams.indexOf(b) >= 0 && ok(a));
+}
+/* "numbers 0–12", or "the 3s, 6s and 11s (with 0–12)" for a Custom round. */
+function practiceLabel(r){
+  if(!r.fams || !r.fams.length) return "numbers " + r.min + "–" + r.max;
+  const names = r.fams.map(function(f){ return f + "s"; });
+  const list = names.length < 2 ? names[0]
+    : names.slice(0, -1).join(", ") + " and " + names[names.length-1];
+  return "the " + list + " (with " + r.min + "–" + r.max + ")";
+}
+
 /* ---- the deck ----
    Independent random draws collide far more often than people expect, which is
    why uniform sampling *feels* repetitive. So the non-adaptive draws come off a
    shuffled deck of every fact in range and are dealt without replacement: even
    coverage, no repeat until the deck runs out. */
 function bagSignature(){
-  return cfg.ops.slice().sort().join(",") + "|" + cfg.min + "-" + cfg.max;
+  return cfg.ops.slice().sort().join(",") + "|" + cfg.min + "-" + cfg.max +
+    "|" + (activeFams() || []).join(",");
 }
 function buildBag(){
   const list = [];
   cfg.ops.forEach(function(op){
-    const blo = (op === "div") ? Math.max(1, cfg.min) : cfg.min;
-    const bhi = (op === "div") ? Math.max(1, cfg.max) : cfg.max;
-    for(let a = cfg.min; a <= cfg.max; a++)
-      for(let b = blo; b <= bhi; b++)
-        list.push(op+"|"+a+"|"+b);
+    for(let a = 0; a <= 12; a++)
+      for(let b = 0; b <= 12; b++)
+        if(inPractice(op, a, b)) list.push(op+"|"+a+"|"+b);
   });
   for(let i = list.length-1; i > 0; i--){
     const j = Math.floor(Math.random()*(i+1));
@@ -1737,12 +1787,9 @@ function pickFact(){
 
   /* Tricky facts and families come from the player's whole history, so keep
      only the ones inside the chosen range — a 7 × 12 missed on the full set
-     mustn't turn up in a 0-to-5 round. */
-  const lo = cfg.min, hi = cfg.max;
-  const inRange = function(k){
-    const f = keyToFact(k);
-    return f.a >= lo && f.a <= hi && f.b >= (f.op === "div" ? Math.max(1, lo) : lo) && f.b <= hi;
-  };
+     mustn't turn up in a 0-to-5 round, or in a round of just the 3s. */
+  const lo = cfg.min, hi = cfg.max, fams = activeFams();
+  const inRange = function(k){ const f = keyToFact(k); return inPractice(f.op, f.a, f.b); };
   const ad = adapt();
   if(ad.rate > 0 && Math.random() < ad.rate){
     const op = cfg.ops[Math.floor(Math.random()*cfg.ops.length)];
@@ -1750,7 +1797,9 @@ function pickFact(){
       const tr = troubleList(op).filter(function(e){ return inRange(e[0]); }).slice(0, ad.pool);
       if(tr.length) return keyToFact(weightedPick(tr.map(function(e){ return [e[0], e[1]]; })));
     }
-    const wf = weakFamilies(op).filter(function(x){ return x.fam >= lo && x.fam <= hi; }).slice(0, 4);
+    const wf = weakFamilies(op).filter(function(x){
+      return fams ? fams.indexOf(x.fam) >= 0 : (x.fam >= lo && x.fam <= hi);
+    }).slice(0, 4);
     if(wf.length){
       const w = weightedPick(wf.map(function(x){ return [x, x.score]; }));
       return famFact(op, w.fam, cfg.min, cfg.max);
@@ -1784,7 +1833,8 @@ function startRound(){
   recent = []; typed = "";
   run = {
     mode: cfg.mode, seconds: cfg.seconds, ops: cfg.ops.slice(),
-    min: cfg.min, max: cfg.max, drill: cfg.drill ? cfg.drill.slice() : null,
+    min: cfg.min, max: cfg.max, fams: activeFams() ? cfg.fams.slice() : null,
+    drill: cfg.drill ? cfg.drill.slice() : null,
     drillFam: cfg.drillFam ? {op:cfg.drillFam.op, fam:cfg.drillFam.fam} : null,
     diff: cfg.diff, adaptive: cfg.adaptive, style: cfg.style, nChoices: diff().choices,
     started: Date.now(), attempts: [], correct: 0, score: 0,
@@ -2234,7 +2284,7 @@ function commitRun(){
   });
   const summary = {
     at: run.started, mode: run.mode, seconds: run.seconds, ops: run.ops,
-    min: run.min, max: run.max, drill: !!(run.drill || run.drillFam),
+    min: run.min, max: run.max, fams: run.fams, drill: !!(run.drill || run.drillFam),
     d: run.diff, adaptive: run.adaptive, style: run.style,
     score: run.score, correct: run.correct, total: run.attempts.length,
     bestStreak: run.bestStreak,
@@ -2657,7 +2707,7 @@ function summaryText(){
     new Date(run.started).toLocaleString(),
     (run.mode === "sprint" ? run.seconds+"-second sprint" : "Survival") +
       "  ·  " + (DIFF[run.diff]||DIFF[3]).name +
-      "  ·  numbers "+run.min+"–"+run.max +
+      "  ·  " + practiceLabel(run) +
       "  ·  " + run.ops.map(function(o){return OPS[o].short;}).join(", "),
     "",
     "Score: "+run.score+"   Rank: "+rankFor(run.score),
@@ -2895,20 +2945,26 @@ $("rangeChips").addEventListener("click", function(e){
   cfg.rangePreset = b.dataset.range;
   if(cfg.rangePreset !== "custom"){
     const p = cfg.rangePreset.split("-"); cfg.min = +p[0]; cfg.max = +p[1];
-    $("rangeMin").value = cfg.min; $("rangeMax").value = cfg.max;
+  }else{
+    cfg.min = 0; cfg.max = cfg.famMax;
   }
   const kids = $("rangeChips").children;
   for(let i=0;i<kids.length;i++)
     kids[i].setAttribute("aria-pressed", kids[i].dataset.range===cfg.rangePreset ? "true":"false");
   syncSetup();
 });
-$("rangeMin").addEventListener("change", function(){
-  cfg.min = +this.value;
-  if(cfg.min > cfg.max){ cfg.max = cfg.min; $("rangeMax").value = cfg.max; }
+$("famChips").addEventListener("click", function(e){
+  const b = e.target.closest("[data-fam]"); if(!b) return;
+  const f = +b.dataset.fam, i = cfg.fams.indexOf(f);
+  if(i >= 0) cfg.fams.splice(i,1); else cfg.fams.push(f);
+  cfg.fams.sort(function(x,y){ return x-y; });
+  b.setAttribute("aria-pressed", i>=0 ? "false":"true");
+  syncSetup();
 });
-$("rangeMax").addEventListener("change", function(){
-  cfg.max = +this.value;
-  if(cfg.max < cfg.min){ cfg.min = cfg.max; $("rangeMin").value = cfg.min; }
+$("partnerChips").addEventListener("click", function(e){
+  const b = e.target.closest("[data-partner]"); if(!b) return;
+  cfg.famMax = +b.dataset.partner; cfg.min = 0; cfg.max = cfg.famMax;
+  syncSetup();
 });
 $("modeCards").addEventListener("click", function(e){
   const b = e.target.closest("[data-mode]"); if(!b) return;

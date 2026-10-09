@@ -26,6 +26,10 @@ followed by subtraction, or addition followed by division.
   separately or leave them out.
 - Voice answers include recognition lag. Keep them apart from typed times,
   as the fact grid already does.
+- Pick it answers are faster than typed ones (and Pick it is now the default),
+  so keep switch stats separate by answer style too, the way the fact stats
+  already split into `player.facts` and `player.pfacts`. Otherwise a kid who
+  moves from Type it to Pick it looks like they got better at switching.
 - Only rounds with two or more kinds of math produce switch pairs, and random
   order won't give every pair equal numbers. Maybe add an option to deliberately
   alternate kinds of math so pairs fill in faster.

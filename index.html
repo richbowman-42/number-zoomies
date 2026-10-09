@@ -921,7 +921,7 @@ let DB = loadDB();
 let player = null;
 let cfg = {
   ops:["add","sub","mul","div"], min:0, max:12, rangePreset:"0-12", fams:[], famMax:12,
-  mode:"survival", style:"type", seconds:60, autoAdvance:true, adaptive:"balanced", diff:3,
+  mode:"survival", style:"pick", seconds:60, autoAdvance:true, adaptive:"balanced", diff:3,
   drill:null, drillFam:null, sparkStyle:"confetti", sparkAmount:"normal", voice:false
 };
 
@@ -1418,7 +1418,7 @@ function choosePlayer(p){
   cfg.diff = DIFF[p.diff] ? p.diff : 3;
   cfg.adaptive = ADAPT[p.adaptive] ? p.adaptive : "balanced";
   cfg.voice = !!p.voice && voiceSupported();
-  cfg.style = p.style === "pick" ? "pick" : "type";
+  cfg.style = p.style === "type" ? "type" : "pick";
   $("diffSlider").value = cfg.diff;
   syncFx();
   syncSetup();
@@ -2844,7 +2844,7 @@ function importBackup(raw){
     const clean = {id:id, name:name, facts:inc.facts || {}, pfacts:inc.pfacts || {},
                    runs:Array.isArray(inc.runs) ? inc.runs : [],
                    best:inc.best || {}, fx:inc.fx, diff:inc.diff, adaptive:inc.adaptive, voice:inc.voice,
-                   style: inc.style === "pick" ? "pick" : "type"};
+                   style: inc.style === "type" ? "type" : "pick"};
     if(matchId){
       DB.players[matchId] = mergePlayer(DB.players[matchId], clean);
       DB.players[matchId].id = matchId;
